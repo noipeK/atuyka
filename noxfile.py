@@ -84,7 +84,7 @@ def reformat(session: nox.Session) -> None:
     LOGGER.disabled = False
 
 
-@nox.session(name="test")
+@nox.session(name="test", python=["3.10", "3.11"])
 def test(session: nox.Session) -> None:
     """Run this project's tests using pytest."""
     install_requirements(session, "pytest")

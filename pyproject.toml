@@ -9,6 +9,7 @@ line-length = 120
 profile = "black"
 
 [tool.pytest.ini_options]
+asyncio_mode = "auto"
 testpaths = ["tests"]
 
 [tool.pyright]
@@ -33,11 +34,13 @@ sort = "cover"
 
 [tool.flake8]
 exclude = ["tests", "test.py"]
+# A003: Shadowing built-in
 # D105: Missing docstring in magic method
 # S101: Use of assert
 # S110: Try, Except, Pass
 # W:503: anti-pattern Line break before binary operator
 ignore = [
+    "A003",
     "D105",  
     "S101",  
     "S110",  
