@@ -1,10 +1,10 @@
-# {{repository_name}}
+# atuyka
 
-{{repository_description}}
+Sea string.
 
 ---
 
-Source Code: https://github.com/{{repository_owner}}/{{repository_name}}
+Source Code: https://github.com/noipeK/atuyka
 
 ---
 

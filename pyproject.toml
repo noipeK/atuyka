@@ -12,7 +12,7 @@ profile = "black"
 testpaths = ["tests"]
 
 [tool.pyright]
-include = ["{{repository_name}}"]
+include = ["atuyka"]
 exclude = ["**/__init__.py", "tests/**"]
 
 typeCheckingMode = "strict"
@@ -23,7 +23,7 @@ reportUnusedFunction = "none"  # Makes usage of validators impossible
 reportPrivateUsage = "none"
 
 [tool.coverage.run]
-source = ["{{repository_name}}"]
+source = ["atuyka"]
 omit = ["**/__init__.py", "**/__main__.py"]
 
 [tool.coverage.report]

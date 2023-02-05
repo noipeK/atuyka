@@ -10,8 +10,8 @@ import nox
 
 nox.options.sessions = ["reformat", "lint", "type-check", "verify-types", "test", "prettier"]
 nox.options.reuse_existing_virtualenvs = True
-PACKAGE = "{{repository_name}}"
-GENERAL_TARGETS = ["./{{repository_name}}", "./tests", "./noxfile.py", "docs/conf.py"]
+PACKAGE = "atuyka"
+GENERAL_TARGETS = ["./atuyka", "./tests", "./noxfile.py", "docs/conf.py"]
 PRETTIER_TARGETS = ["*.md", "docs/*.md", "docs/**/*.md", "*.toml"]
 PYRIGHT_ENV = {"PYRIGHT_PYTHON_FORCE_VERSION": "latest"}
 

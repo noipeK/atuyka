@@ -10,7 +10,7 @@ if typing.TYPE_CHECKING:
 
 # -- Project information -----------------------------------------------------
 
-project = "{{repository_name}}"
+project = "atuyka"
 
 # -- General configuration ---------------------------------------------------
 
@@ -35,7 +35,7 @@ default_role = "py:obj"
 # originally we would use sphinx_material but that's broken af
 html_theme = "furo"
 html_theme_options = {
-    "source_repository": "https://github.com/{{repository_owner}}/{{repository_name}}",
+    "source_repository": "https://github.com/noipeK/atuyka",
     "source_branch": "master",
 }
 html_show_sourcelink = False
@@ -44,7 +44,7 @@ html_show_sourcelink = False
 # -- AutoAPI options ----------------------------------------------------------
 
 autoapi_root = "reference"
-autoapi_dirs = ["../{{repository_name}}"]
+autoapi_dirs = ["../atuyka"]
 autoapi_ignore = ["__main__.py"]
 
 autoapi_options = ["members", "special-members"]

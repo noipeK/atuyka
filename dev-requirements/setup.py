@@ -50,7 +50,7 @@ def get_extras(directory: pathlib.Path) -> typing.Dict[str, typing.List[str]]:
 
 dev_directory = pathlib.Path(__file__).parent
 setuptools.setup(
-    name="{{repository_name}}-dev",
+    name="atuyka-dev",
     install_requires=get_normal_requirements(dev_directory) + ["nox"],
     extras_require=get_extras(dev_directory),
 )

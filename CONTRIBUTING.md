@@ -1,4 +1,4 @@
-# {{repository_name}} contributing guide
+# atuyka contributing guide
 
 ## Setting up the environment
 
