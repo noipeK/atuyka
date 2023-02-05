@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 120
+
+[tool.isort]
+profile = "black"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+include = ["{{repository_name}}"]
+exclude = ["**/__init__.py", "tests/**"]
+
+typeCheckingMode = "strict"
+reportMissingTypeStubs = "none"
+reportImportCycles = "none"
+reportIncompatibleMethodOverride = "none"  # This relies on ordering for keyword-only arguments
+reportUnusedFunction = "none"  # Makes usage of validators impossible
+reportPrivateUsage = "none"
+
+[tool.coverage.run]
+source = ["{{repository_name}}"]
+omit = ["**/__init__.py", "**/__main__.py"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+sort = "cover"
+
+[tool.flake8]
+exclude = ["tests", "test.py"]
+# D105: Missing docstring in magic method
+# S101: Use of assert
+# S110: Try, Except, Pass
+# W:503: anti-pattern Line break before binary operator
+ignore = [
+    "D105",  
+    "S101",  
+    "S110",  
+    "W503",  
+]
+# D40*: docstring formatting
+# F401: unused import
+# F403: cannot detect unused vars if we use starred import
+# D10*: docstrings
+# S10*: hardcoded passwords
+# F841: unused variable
+# I900: dev dependency
+per-file-ignores = [
+    "**/__init__.py: D40, F401, F403",
+    "tests/**: D10, S10, F841, I900",
+    "noxfile.py: I900",
+    "docs/**: I900",
+    "dev-requirements/**: I900",
+]
+max-complexity = 15
+max-function-length = 100
+max-line-length = 130
+
+max_annotations_complexity = 5
+
+accept-encodings = "utf-8"
+docstring-convention = "numpy"
+ignore-decorators = "property"
+requirements_file = "requirements.txt"

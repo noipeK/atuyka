@@ -1,0 +1,46 @@
+name: Update the project from template
+
+on: [push]
+
+permissions: write-all
+
+jobs:
+  update-project:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - run: |
+          REPOSITORY_DATA=$( \
+            curl --silent -X GET https://api.github.com/repos/$GITHUB_REPOSITORY \
+              -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github.baptiste-preview+json" \
+          )
+
+          echo $REPOSITORY_DATA | jq --exit-status '.is_template == false'
+
+          REPOSITORY_NAME=$(echo $REPOSITORY_DATA | jq -r '.name')
+          REPOSITORY_OWNER=$(echo $REPOSITORY_DATA | jq -r '.owner.login')
+          REPOSITORY_DESCRIPTION=$(echo $REPOSITORY_DATA | jq -r '.description')
+          echo "$REPOSITORY_OWNER/$REPOSITORY_NAME - $REPOSITORY_DESCRIPTION"
+
+          for filename in $(git ls-files)
+          do
+              if [[ "$filename" == *"workflows"* ]]
+              then
+                continue
+              fi
+
+              sed -i "s/{{repository_name}}/$REPOSITORY_NAME/g" $filename
+              sed -i "s/{{repository_owner}}/$REPOSITORY_OWNER/g" $filename
+              sed -i "s/{{repository_description}}/$REPOSITORY_DESCRIPTION/g" $filename
+              echo "Changed $filename"
+          done
+
+          mv "{{repository_name}}" "$REPOSITORY_NAME"
+
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.name "github-actions[bot]"
+          git add .
+          git commit -m 'Update template'
+          git push
