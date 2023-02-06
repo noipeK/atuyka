@@ -1,5 +1,4 @@
 """Twitter front-end API client."""
-import asyncio
 import collections.abc
 import re
 import typing
@@ -9,9 +8,13 @@ import pydantic
 
 from . import models
 
+# https://github.com/KohnoseLami/Twitter_Frontend_API
+
 UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 GUEST_AUTHORIZATION = (
-    "Bearer AAAAAAAAAAAAAAAAAAAAANRILgAAAAAAnNwIzUejRCOuH5E6I8xnZz4puTs%3D1Zv7ttfk8LF81IUq16cHjhLTvJu4FA33AGWWjCpTnA"
+    "Bearer "
+    + "AAAAAAAAAAAAAAAAAAAAAF7aAAAAAAAASCiRjWvh7R5wxaKkFp7MM%2BhYBqM="
+    + "bQ0JPmjU9F6ZoMhDfI4uTNAaQuTDm2uO9x3WFVr2xBZ2nhjdP0"
 )
 
 __all__ = ["Twitter"]
@@ -90,7 +93,7 @@ class Twitter:
             "Origin": "https://twitter.com",
             "User-Agent": self.user_agent,
             "Content-Type": "application/json",
-            "Authorization": GUEST_AUTHORIZATION,
+            "Authorization": self.guest_authorization,
             "Cookie": f"auth_token={self.auth_token}; ct0={self.ct0}",
             "x-csrf-token": self.ct0,
         }
@@ -118,7 +121,8 @@ class Twitter:
         if params:
             params = {k: v for k, v in params.items() if v is not None}
 
-        async with aiohttp.request(method, url, headers=headers, **kwargs) as response:
+        async with aiohttp.request(method, url, params=params, headers=headers, **kwargs) as response:  # type: ignore
+            response.raise_for_status()
             data = await response.json(content_type=None)
 
         if "error" in data:
@@ -150,16 +154,44 @@ class Twitter:
         data = await self.request(url, params=params)
         return pydantic.parse_obj_as(collections.abc.Sequence[models.Tweet], data)
 
+    async def get_friends(
+        self,
+        screen_name: str,
+        cursor: int | None = None,
+        count: int | None = None,
+        skip_status: bool | None = None,
+        include_user_entities: bool | None = None,
+        tweet_mode: str | None = None,
+    ) -> models.UserCursor:
+        """Get the friends of a user."""
+        url = "https://api.twitter.com/1.1/friends/list.json"
+        params = dict(
+            screen_name=screen_name,
+            cursor=cursor,
+            count=count,
+            skip_status=skip_status,
+            include_user_entities=include_user_entities,
+            tweet_mode=tweet_mode,
+        )
+        data = await self.request(url, params=params)
+        return pydantic.parse_obj_as(models.UserCursor, data)
 
-async def main() -> None:
-    """Run the main function."""
-    user = input("Enter your twitter username: ")
-    token = input("Enter your twitter auth token: ")
-    client = Twitter(token)
+    async def get_user_info(self, user: int | str) -> models.TwitterUser:
+        """Get the info of a user."""
+        url = "https://api.twitter.com/1.1/users/show.json"
+        if isinstance(user, int):
+            params = dict(user_id=user)
+        else:
+            params = dict(screen_name=user)
 
-    favorites = await client.get_favorites(user)
-    print(repr(favorites))  # noqa: T201
+        data = await self.request(url, params=params)
+        return pydantic.parse_obj_as(models.TwitterUser, data)
 
+    async def get_user_tweets(self, user: int | str) -> models.Timeline:
+        """Get the tweets of a user."""
+        if isinstance(user, str):
+            user = (await self.get_user_info(user)).id
 
-if __name__ == "__main__":
-    asyncio.run(main())
+        url = f"https://api.twitter.com/2/timeline/profile/{user}.json"
+        data = await self.request(url)
+        return pydantic.parse_obj_as(models.Timeline, data)

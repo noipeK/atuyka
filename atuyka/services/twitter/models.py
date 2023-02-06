@@ -9,7 +9,7 @@ class TweetHashtag(pydantic.BaseModel):
 
     text: str
     """Hashtag text."""
-    indices: collections.abc.Sequence[int]
+    indices: tuple[int, int]
     """Position of the hashtag in the tweet."""
 
 
@@ -24,7 +24,7 @@ class TweetUserMention(pydantic.BaseModel):
     """ID of the user mentioned."""
     id_str: int
     """ID of the user mentioned as a string."""
-    indices: collections.abc.Sequence[int]
+    indices: tuple[int, int]
     """Position of the user mention in the tweet."""
 
 
@@ -37,7 +37,7 @@ class TweetURL(pydantic.BaseModel):
     """Real URL."""
     display_url: str
     """Shortened URL."""
-    indices: collections.abc.Sequence[int]
+    indices: tuple[int, int]
     """Position of the URL in the tweet."""
 
 
@@ -72,7 +72,7 @@ class TwitterMediaSizeWithRect(pydantic.BaseModel):
     """Width of the media."""
     height: int
     """Height of the media."""
-    focus_rects: collections.abc.Sequence[TwitterMediaRect] | None = None
+    focus_rects: collections.abc.Sequence[TwitterMediaRect] | None
     """IDK."""
 
 
@@ -99,15 +99,15 @@ class TwitterMediaFaces(pydantic.BaseModel):
 class TwitterMediaEntityFeatures(pydantic.BaseModel):
     """Faces in the media."""
 
-    all: TwitterMediaFaces | None = None
+    all: TwitterMediaFaces | None
     """Faces in all media."""
-    small: TwitterMediaFaces | None = None
+    small: TwitterMediaFaces | None
     """Faces in small media."""
-    medium: TwitterMediaFaces | None = None
+    medium: TwitterMediaFaces | None
     """Faces in medium media."""
-    large: TwitterMediaFaces | None = None
+    large: TwitterMediaFaces | None
     """Faces in large media."""
-    orig: TwitterMediaFaces | None = None
+    orig: TwitterMediaFaces | None
     """Faces in original media."""
 
 
@@ -118,7 +118,7 @@ class TwitterMediaEntity(pydantic.BaseModel):
     """Media ID.""" ""
     id_str: int
     """Media ID as a string.""" ""
-    indices: collections.abc.Sequence[int]
+    indices: tuple[int, int]
     """Position of the media in the entity."""
     media_url: str
     """Media thumbnail."""
@@ -151,14 +151,14 @@ class TweetEntities(pydantic.BaseModel):
     """User mentions in the tweet."""
     urls: collections.abc.Sequence[TweetURL]
     """URLs in the tweet."""
-    media: collections.abc.Sequence[TwitterMediaEntity] | None = None
+    media: collections.abc.Sequence[TwitterMediaEntity] | None
     """Media in the tweet."""
 
 
 class TwitterVideoVariant(pydantic.BaseModel):
     """Video variant info."""
 
-    bitrate: int | None = None
+    bitrate: int | None
     """Bitrate of the video variant."""
     content_type: str
     """Content type of the video variant."""
@@ -200,15 +200,15 @@ class TwitterMediaTags(pydantic.BaseModel):
 class TwitterMediaFeatures(pydantic.BaseModel):
     """Twitter tags in the media."""
 
-    all: TwitterMediaTags | None = None
+    all: TwitterMediaTags | None
     """Tags in all media."""
-    small: TwitterMediaTags | None = None
+    small: TwitterMediaTags | None
     """Tags in small media."""
-    medium: TwitterMediaTags | None = None
+    medium: TwitterMediaTags | None
     """Tags in medium media."""
-    large: TwitterMediaTags | None = None
+    large: TwitterMediaTags | None
     """Tags in large media."""
-    orig: TwitterMediaTags | None = None
+    orig: TwitterMediaTags | None
     """Tags in original media."""
 
 
@@ -226,7 +226,7 @@ class TwitterMedia(pydantic.BaseModel):
     """Media ID.""" ""
     id_str: int
     """Media ID as a string.""" ""
-    indices: collections.abc.Sequence[int]
+    indices: tuple[int, int]
     """Position of the media in the entity."""
     media_url: str
     """Media thumbnail."""
@@ -244,13 +244,13 @@ class TwitterMedia(pydantic.BaseModel):
     """Sizes of the original media."""
     sizes: TwitterMediaSizes
     """Sizes of the media."""
-    video_info: TwitterVideoInfo | None = None
+    video_info: TwitterVideoInfo | None
     """IDK."""
     features: TwitterMediaFeatures
     """Media features."""
     media_key: str
     """IDK."""
-    additional_media_info: TwitterMediaExtraInfo | None = None
+    additional_media_info: TwitterMediaExtraInfo | None
     """IDK."""
 
 
@@ -284,7 +284,7 @@ class TwitterURLableEntity(pydantic.BaseModel):
 class TwitterUserEntities(pydantic.BaseModel):
     """The entities in a Twitter user profile."""
 
-    url: TwitterURLableEntity | None = None
+    url: TwitterURLableEntity | None
     """URL details."""
     description: TwitterURLableEntity
     """Description details."""
@@ -305,7 +305,7 @@ class TwitterUser(pydantic.BaseModel):
     """The location of the user."""
     description: str
     """The description of the user."""
-    url: str | None = None
+    url: str | None
     """The website of the user."""
     entities: TwitterUserEntities
     """The entities on the user."""
@@ -325,9 +325,9 @@ class TwitterUser(pydantic.BaseModel):
     """Human-readable date of when the account was created."""
     favourites_count: int
     """The number of likes the user has."""
-    utc_offset: object | None = None
+    utc_offset: object | None
     """IDK."""
-    time_zone: object | None = None
+    time_zone: object | None
     """IDK."""
     geo_enabled: bool
     """IDK."""
@@ -337,7 +337,7 @@ class TwitterUser(pydantic.BaseModel):
     """The number of tweets the user has."""
     media_count: int
     """The number of media the user has posted."""
-    lang: object | None = None
+    lang: object | None
     """IDK."""
     contributors_enabled: bool
     """IDK."""
@@ -347,9 +347,9 @@ class TwitterUser(pydantic.BaseModel):
     """IDK."""
     profile_background_color: str
     """The background theme color of the user's profile."""
-    profile_background_image_url: str | None = None
+    profile_background_image_url: str | None
     """The background theme image of the user's profile."""
-    profile_background_image_url_https: str | None = None
+    profile_background_image_url_https: str | None
     """The background theme image of the user's profile."""
     profile_background_tile: bool
     """IDK."""
@@ -357,7 +357,7 @@ class TwitterUser(pydantic.BaseModel):
     """The profile image of the user."""
     profile_image_url_https: str
     """The profile image of the user."""
-    profile_banner_url: str | None = None
+    profile_banner_url: str | None
     """The profile banner of the user."""
     profile_link_color: str
     """The link color of the user's profile."""
@@ -375,25 +375,25 @@ class TwitterUser(pydantic.BaseModel):
     """IDK."""
     default_profile_image: bool
     """IDK."""
-    pinned_tweet_ids: collections.abc.Sequence[int]
+    pinned_tweet_ids: collections.abc.Sequence[int] | None
     """The IDs of the pinned tweets."""
-    pinned_tweet_ids_str: collections.abc.Sequence[int]
+    pinned_tweet_ids_str: collections.abc.Sequence[int] | None
     """The IDs of the pinned tweets as strings."""
     has_custom_timelines: bool
     """IDK."""
-    can_media_tag: bool
+    can_media_tag: bool | None
     """IDK."""
-    followed_by: bool
+    followed_by: bool | None
     """Whether the authenticated user is followed by the user."""
-    following: bool
+    following: bool | None
     """Whether the authenticated user is following the user."""
-    follow_request_sent: bool
+    follow_request_sent: bool | None
     """Whether the authenticated user has sent a follow request to the user."""
-    notifications: bool
+    notifications: bool | None
     """IDK."""
-    advertiser_account_type: str
+    advertiser_account_type: str | None
     """IDK."""
-    advertiser_account_service_levels: collections.abc.Sequence[str]
+    advertiser_account_service_levels: collections.abc.Sequence[str] | None
     """IDK."""
     business_profile_state: str
     """IDK."""
@@ -420,29 +420,29 @@ class Tweet(pydantic.BaseModel):
     """Whether the tweet content is truncated."""
     entities: TweetEntities
     """The special entities of the tweet."""
-    extended_entities: TweetExtendedEntities | None = None
+    extended_entities: TweetExtendedEntities | None
     """Details about the media in the tweet."""
     source: str
     """Source platform of the tweet."""
-    in_reply_to_status_id: object | None = None
+    in_reply_to_status_id: object | None
     """IDK."""
-    in_reply_to_status_id_str: object | None = None
+    in_reply_to_status_id_str: object | None
     """IDK."""
-    in_reply_to_user_id: object | None = None
+    in_reply_to_user_id: object | None
     """IDK."""
-    in_reply_to_user_id_str: object | None = None
+    in_reply_to_user_id_str: object | None
     """IDK."""
-    in_reply_to_screen_name: object | None = None
+    in_reply_to_screen_name: object | None
     """IDK."""
-    user: TwitterUser
+    user: TwitterUser | None
     """The user who posted the tweet."""
-    geo: object | None = None
+    geo: object | None
     """IDK."""
-    coordinates: object | None = None
+    coordinates: object | None
     """IDK."""
-    place: object | None = None
+    place: object | None
     """IDK."""
-    contributors: object | None = None
+    contributors: object | None
     """IDK."""
     is_quote_status: bool
     """Whether the tweet is a quote."""
@@ -458,11 +458,57 @@ class Tweet(pydantic.BaseModel):
     """Whether the tweet is liked by the authenticated user."""
     retweeted: bool
     """Whether the tweet is retweeted by the authenticated user."""
-    possibly_sensitive: bool
+    possibly_sensitive: bool | None
     """Whether the tweet is possibly sensitive."""
-    possibly_sensitive_editable: bool
+    possibly_sensitive_editable: bool | None
     """Whether the tweet sensitivity is not precisely known."""
     lang: str
     """Language of the tweet."""
-    supplemental_language: object | None = None
+    supplemental_language: object | None
     """IDK."""
+
+
+# ====================
+
+
+class Cursor(pydantic.BaseModel):
+    """A cursor."""
+
+    next_cursor: int
+    """The next cursor."""
+    next_cursor_str: str
+    """The next cursor as a string."""
+    previous_cursor: int
+    """The previous cursor."""
+    previous_cursor_str: str
+    """The previous cursor as a string."""
+    total_count: int | None
+    """The total number of items in the cursor."""
+
+
+class UserCursor(Cursor):
+    """A cursor of users."""
+
+    users: collections.abc.Sequence[TwitterUser]
+    """The users in the cursor."""
+
+
+# ====================
+
+
+class TimelineObjects(pydantic.BaseModel):
+    """A collection of timeline objects."""
+
+    tweets: collections.abc.Mapping[int, Tweet]
+    """Tweets in the timeline."""
+    users: collections.abc.Mapping[int, TwitterUser]
+    """Users in the timeline."""
+
+
+class Timeline(pydantic.BaseModel):
+    """A timeline summary."""
+
+    globalObjects: TimelineObjects
+    """Timeline objects."""
+    timeline: object
+    """Timeline order."""
