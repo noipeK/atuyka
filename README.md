@@ -1,6 +1,6 @@
 # atuyka
 
-Sea string.
+Backend to view and various art and video related social media with a focus on asian sites.
 
 ---
 

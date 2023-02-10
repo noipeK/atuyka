@@ -1,2 +1,5 @@
+typing_extensions
 aiohttp
 pydantic
+
+pixivpy-async

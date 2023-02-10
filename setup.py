@@ -9,6 +9,10 @@ setup(
     packages=find_packages(exclude=["tests.*"]),
     include_package_data=True,
     package_data={"atuyka": ["py.typed"]},
+    requires=["aiohttp", "pydantic"],
+    extras_require={
+        "pixiv": ["pixivpy_async"],
+    },
     long_description=open("README.md", encoding="utf-8").read(),
     long_description_content_type="text/markdown",
     license="MIT",
