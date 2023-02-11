@@ -12,11 +12,11 @@ T = typing.TypeVar("T")
 class PixivImageURLs(pydantic.BaseModel):
     """A pixiv image URLs."""
 
-    square_medium: str | None = None
+    square_medium: str | None
     """The square medium image URL."""
     medium: str
     """The medium image URL."""
-    large: str | None = None
+    large: str | None
     """The large image URL."""
 
 
@@ -54,7 +54,7 @@ class PixivTag(pydantic.BaseModel):
 
     name: str
     """The tag name."""
-    translated_name: str | None = None
+    translated_name: str | None
     """The translated tag name."""
 
 
@@ -100,11 +100,11 @@ class PixivIllust(pydantic.BaseModel):
     """IDK."""
     x_restrict: int
     """IDK."""
-    series: PixivSeries | None = None
+    series: PixivSeries | None
     """The pixiv series this artwork is part of."""
-    meta_single_page: PixivIllustSingleMetaImageURLs | None = None
+    meta_single_page: PixivIllustSingleMetaImageURLs | None
     """Metadata for a single image post."""
-    meta_pages: collections.abc.Sequence[PixivIllustMeta] | None = None
+    meta_pages: collections.abc.Sequence[PixivIllustMeta] | None
     """Metadata for a multi-image post."""
     total_view: int
     """The total number of views."""

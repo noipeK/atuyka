@@ -6,9 +6,12 @@ import typing
 import aiohttp
 import pydantic
 
+from atuyka.services import base
+
 from . import models
 
 # https://github.com/KohnoseLami/Twitter_Frontend_API
+# TOOD: use graphql for more detailed information
 
 UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 GUEST_AUTHORIZATION = (
@@ -20,10 +23,12 @@ GUEST_AUTHORIZATION = (
 __all__ = ["Twitter"]
 
 
-class Twitter:
+class Twitter(base.ServiceClient):
     """Twitter front-end API client."""
 
     auth_token: str | None
+    my_name: str
+
     ct0: str | None
     guest_token: str | None
     guest_authorization: str
@@ -32,18 +37,22 @@ class Twitter:
     def __init__(
         self,
         token: str | None = None,
+        my_name: str | None = None,
+        *,
         ct0: str | None = None,
         guest_token: str | None = None,
         guest_authorization: str | None = None,
         user_agent: str | None = None,
     ) -> None:
         self.auth_token = token
+        self.my_name = my_name or "twitter"
+
         self.ct0 = ct0
         self.guest_token = guest_token
         self.guest_authorization = guest_authorization or GUEST_AUTHORIZATION
         self.user_agent = user_agent or UA
 
-    async def generate_guest_token(self) -> str:
+    async def _generate_guest_token(self) -> str:
         """Generate the token."""
         headers = {"User-Agent": self.user_agent, "Authorization": self.guest_authorization}
         async with aiohttp.request(
@@ -55,12 +64,12 @@ class Twitter:
 
         return data["guest_token"]
 
-    async def generate_ct0(self) -> str:
+    async def _generate_ct0(self) -> str:
         """Generate the ct0 token."""
         async with aiohttp.request("GET", "https://twitter.com/i/release_notes") as response:
             return response.cookies["ct0"].value
 
-    async def generate_authenticity_token(self) -> str:
+    async def _generate_authenticity_token(self) -> str:
         """Generate the authenticity token."""
         async with aiohttp.request("GET", "https://twitter.com/account/begin_password_reset") as response:
             text = await response.text()
@@ -72,7 +81,7 @@ class Twitter:
     async def get_guest_headers(self) -> collections.abc.Mapping[str, str]:
         """Return the headers for the request."""
         if not self.guest_token:
-            self.guest_token = await self.generate_guest_token()
+            self.guest_token = await self._generate_guest_token()
 
         return {
             "User-Agent": self.user_agent,
@@ -87,7 +96,7 @@ class Twitter:
             raise ValueError("No auth token provided.")
 
         if not self.ct0:
-            self.ct0 = await self.generate_ct0()
+            self.ct0 = await self._generate_ct0()
 
         return {
             "Origin": "https://twitter.com",
@@ -134,7 +143,8 @@ class Twitter:
 
     async def get_favorites(
         self,
-        screen_name: str,
+        screen_name: str | None = None,
+        *,
         count: int | None = None,
         since_id: int | None = None,
         max_id: int | None = None,
@@ -144,7 +154,7 @@ class Twitter:
         """Get the favorites of a user."""
         url = "https://api.twitter.com/1.1/favorites/list.json"
         params = dict(
-            screen_name=screen_name,
+            screen_name=screen_name or self.my_name,
             count=count,
             since_id=since_id,
             max_id=max_id,
@@ -156,7 +166,8 @@ class Twitter:
 
     async def get_friends(
         self,
-        screen_name: str,
+        screen_name: str | None = None,
+        *,
         cursor: int | None = None,
         count: int | None = None,
         skip_status: bool | None = None,
@@ -166,7 +177,7 @@ class Twitter:
         """Get the friends of a user."""
         url = "https://api.twitter.com/1.1/friends/list.json"
         params = dict(
-            screen_name=screen_name,
+            screen_name=screen_name or self.my_name,
             cursor=cursor,
             count=count,
             skip_status=skip_status,
@@ -195,3 +206,45 @@ class Twitter:
         url = f"https://api.twitter.com/2/timeline/profile/{user}.json"
         data = await self.request(url)
         return pydantic.parse_obj_as(models.Timeline, data)
+
+    # ------------------------------------------------------------
+    # UNIVERSAL:
+
+    async def get_recommended_posts(self) -> typing.NoReturn:
+        """Get recommended posts."""
+        raise NotImplementedError
+
+    async def get_following_posts(self) -> typing.NoReturn:
+        """Get posts made by followed users."""
+        raise NotImplementedError
+
+    async def get_liked_posts(
+        self,
+        screen_name: str | None = None,
+        *,
+        since_id: int | None = None,
+        max_id: int | None = None,
+    ) -> base.models.Page[base.models.Post]:
+        """Get liked tweets.
+
+        Parameters
+        ----------
+        screen_name: str
+            The screen name of the user. The authenticated user by default.
+        """
+        tweets = await self.get_favorites(screen_name, since_id=since_id, max_id=max_id)
+        posts = [tweet.to_universal() for tweet in tweets]
+        page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
+        return page
+
+    async def get_author_posts(self) -> typing.NoReturn:
+        """Get posts made by an author."""
+        raise NotImplementedError
+
+    async def search_posts(self) -> typing.NoReturn:
+        """Search posts."""
+        raise NotImplementedError
+
+    async def search_authors(self) -> typing.NoReturn:
+        """Search authors."""
+        raise NotImplementedError

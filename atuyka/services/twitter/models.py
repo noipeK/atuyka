@@ -1,7 +1,10 @@
 """Twitter API models."""
 import collections.abc
+import datetime
 
 import pydantic
+
+from atuyka.services.base import models as base
 
 
 class TweetHashtag(pydantic.BaseModel):
@@ -146,7 +149,7 @@ class TweetEntities(pydantic.BaseModel):
     hashtags: collections.abc.Sequence[TweetHashtag]
     """Hashtags in the tweet."""
     symbols: collections.abc.Sequence[object]
-    """Symbols in the tweet."""
+    """IDK."""
     user_mentions: collections.abc.Sequence[TweetUserMention]
     """User mentions in the tweet."""
     urls: collections.abc.Sequence[TweetURL]
@@ -295,7 +298,7 @@ class TwitterUser(pydantic.BaseModel):
 
     id: int
     """The ID of the user."""
-    id_str: int
+    id_str: str
     """The ID of the user as a string."""
     name: str
     """The name of the user."""
@@ -404,6 +407,39 @@ class TwitterUser(pydantic.BaseModel):
     require_some_consent: bool
     """IDK."""
 
+    def to_universal(self) -> base.User:
+        """Convert the Twitter user to a universal user."""
+        return base.User(
+            service="twitter",
+            id=self.id_str,
+            name=self.name,
+            unique_name=self.screen_name,
+            bio=self.description,
+            url=f"https://twitter.com/{self.screen_name}",
+            alt_url=f"https://nitter.net/{self.screen_name}",
+            avatar=base.Attachment(
+                service="twitter",
+                original=base.AttachmentURL(
+                    service="twitter",
+                    url=self.profile_image_url_https,  # TODO: nitter
+                ),
+            ),
+            banner=base.Attachment(
+                service="twitter",
+                original=base.AttachmentURL(
+                    service="twitter",
+                    url=self.profile_banner_url,  # TODO: nitter
+                ),
+            )
+            if self.profile_banner_url
+            else None,
+            followers=self.followers_count,
+            connections=[],  # TODO
+            tags=[],  # TODO
+            language=None,  # TODO
+            following=self.following,
+        )
+
 
 class Tweet(pydantic.BaseModel):
     """A tweet."""
@@ -412,7 +448,7 @@ class Tweet(pydantic.BaseModel):
     """Human-readable creation date of the tweet."""
     id: int
     """The ID of the tweet."""
-    id_str: int
+    id_str: str
     """The ID of the tweet as a string."""
     text: str
     """The content of the tweet."""
@@ -423,7 +459,7 @@ class Tweet(pydantic.BaseModel):
     extended_entities: TweetExtendedEntities | None
     """Details about the media in the tweet."""
     source: str
-    """Source platform of the tweet."""
+    """Which platform this tweet was made from."""
     in_reply_to_status_id: object | None
     """IDK."""
     in_reply_to_status_id_str: object | None
@@ -466,6 +502,78 @@ class Tweet(pydantic.BaseModel):
     """Language of the tweet."""
     supplemental_language: object | None
     """IDK."""
+
+    def to_universal(self) -> base.Post:
+        """Convert the tweet to a post."""
+        assert self.user
+
+        attachments: list[base.Attachment] = []
+        if self.entities.media:
+            # links to the media
+            for media in self.entities.media:
+                attachments.append(
+                    base.Attachment(
+                        service="twitter",
+                        thumbnail=base.AttachmentURL(
+                            service="twitter",
+                            width=media.sizes.thumb.w,
+                            height=media.sizes.thumb.h,
+                            url=media.media_url_https,  # TODO: nitter
+                        ),
+                        original=base.AttachmentURL(
+                            service="twitter",
+                            width=media.sizes.large.w,
+                            height=media.sizes.large.h,
+                            url=media.expanded_url,  # TODO: nitter
+                        ),
+                    )
+                )
+        if self.extended_entities and self.extended_entities.media:
+            # attached media
+            for media in self.extended_entities.media:
+                attachments.append(
+                    base.Attachment(
+                        service="twitter",
+                        thumbnail=base.AttachmentURL(
+                            service="twitter",
+                            width=media.sizes.thumb.w,
+                            height=media.sizes.thumb.h,
+                            url=media.media_url_https,  # TODO: nitter
+                            alt_url="huh",
+                        ),
+                        original=base.AttachmentURL(
+                            service="twitter",
+                            width=media.sizes.large.w,
+                            height=media.sizes.large.h,
+                            url=media.expanded_url,  # TODO: nitter
+                            alt_url="huh",
+                        ),
+                    )
+                )
+
+        return base.Post(
+            service="twitter",
+            created_at=datetime.datetime.fromtimestamp(
+                ((self.id >> 22) + 1288834974657) / 1000,
+                tz=datetime.timezone.utc,
+            ),
+            id=self.id_str,
+            url=f"https://twitter.com/{self.user.screen_name}/status/{self.id_str}",
+            alt_url=f"https://nitter.net/{self.user.screen_name}/status/{self.id_str}",
+            title=self.text.rsplit("…", 1)[0] + "…" if self.truncated else self.text,
+            description=None,
+            attachments=attachments,
+            tags=[base.Tag(service="twitter", name=hashtag.text) for hashtag in self.entities.hashtags],
+            author=self.user.to_universal(),
+            connections=[
+                base.Connection(url=url.expanded_url)
+                for url in self.entities.urls
+                if "twitter.com" not in url.expanded_url
+            ],
+            nsfw=self.possibly_sensitive or None,
+            language=self.lang,
+            liked=self.favorited,
+        )
 
 
 # ====================

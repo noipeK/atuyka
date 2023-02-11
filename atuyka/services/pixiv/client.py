@@ -6,6 +6,8 @@ import pixivpy_async as pixivpy
 import pydantic
 import typing_extensions
 
+from atuyka.services import base
+
 from . import models
 
 # https://github.com/Mikubill/pixivpy-async
@@ -13,7 +15,7 @@ from . import models
 __all__ = ["Pixiv"]
 
 
-class Pixiv:
+class Pixiv(base.ServiceClient):
     """Pixiv client."""
 
     token: str | None
@@ -102,3 +104,30 @@ class Pixiv:
         )
 
         return pydantic.parse_obj_as(models.PixivPaginatedResource[models.PixivIllust], data)
+
+    # ------------------------------------------------------------
+    # UNIVERSAL:
+
+    async def get_recommended_posts(self) -> typing.NoReturn:
+        """Get recommended posts."""
+        raise NotImplementedError
+
+    async def get_following_posts(self) -> typing.NoReturn:
+        """Get posts made by followed users."""
+        raise NotImplementedError
+
+    async def get_liked_posts(self) -> typing.NoReturn:
+        """Get liked posts."""
+        raise NotImplementedError
+
+    async def get_author_posts(self) -> typing.NoReturn:
+        """Get posts made by an author."""
+        raise NotImplementedError
+
+    async def search_posts(self) -> typing.NoReturn:
+        """Search posts."""
+        raise NotImplementedError
+
+    async def search_authors(self) -> typing.NoReturn:
+        """Search authors."""
+        raise NotImplementedError
