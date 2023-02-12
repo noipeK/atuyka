@@ -22,6 +22,13 @@ class Connection(pydantic.BaseModel):
     """The author of the target ID."""
 
 
+class Mention(pydantic.BaseModel):
+    """A mention of some other resource."""
+
+    url: str
+    """The URL of the mentioned resource."""
+
+
 class AttachmentURL(pydantic.BaseModel):
     """An attachment URL."""
 
@@ -32,6 +39,8 @@ class AttachmentURL(pydantic.BaseModel):
     """The attachment width."""
     height: int | None = None
     """The attachment height."""
+    duration: float | None = None
+    """The video duration in seconds."""
 
     filename: str | None = None
     """The attachment filename."""
@@ -60,6 +69,8 @@ class Attachment(pydantic.BaseModel):
     """The medium attachment URL."""
     large: AttachmentURL | None = None
     """The large attachment URL."""
+    metadata: AttachmentURL | None = None
+    """Extra metadata for the file."""
     original: AttachmentURL
     """The original attachment URL."""
 
@@ -90,6 +101,8 @@ class User(pydantic.BaseModel):
     service: str
     """The service name."""
 
+    created_at: datetime.datetime
+    """The user creation date."""
     id: str
     """The unique author ID."""
     name: str
@@ -110,6 +123,8 @@ class User(pydantic.BaseModel):
     """The amount of followers."""
     connections: collections.abc.Sequence[Connection]
     """The author connections."""
+    mentions: collections.abc.Sequence[Mention]
+    """The post mentions."""
     tags: collections.abc.Sequence[Tag]
     """The author tags."""
     language: str | None = None
@@ -145,6 +160,8 @@ class Post(pydantic.BaseModel):
     """The post author."""
     connections: collections.abc.Sequence[Connection]
     """The post connections."""
+    mentions: collections.abc.Sequence[Mention]
+    """The post mentions."""
     nsfw: bool | None = None
     """Whether the post is NSFW."""
     language: str | None = None

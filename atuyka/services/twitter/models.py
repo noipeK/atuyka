@@ -1,6 +1,9 @@
 """Twitter API models."""
 import collections.abc
 import datetime
+import re
+import urllib.parse
+import warnings
 
 import pydantic
 
@@ -142,6 +145,58 @@ class TwitterMediaEntity(pydantic.BaseModel):
     features: TwitterMediaEntityFeatures
     """Faces in the media."""
 
+    def to_universal(self) -> base.Attachment:
+        """Convert to universal attachment."""
+        # TODO: deduplicate code
+        if self.type == "photo":
+            filename = self.media_url_https.split("/")[-1]
+            content_type = "image/jpeg"
+
+            attachment_urls: dict[str, base.AttachmentURL] = {}
+            for size in ("thumb", "small", "medium", "large"):
+                size_name = {"thumb": "thumbnail"}.get(size, size)
+                url = self.media_url_https + ":" + size
+                attachment_urls[size_name] = base.AttachmentURL(
+                    service="twitter",
+                    width=self.sizes.__getattribute__(size).w,
+                    height=self.sizes.__getattribute__(size).h,
+                    filename=filename,
+                    content_type=content_type,
+                    url=url,
+                    alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
+                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+                )
+
+            url = self.media_url_https + ":orig"
+            attachment_urls["original"] = base.AttachmentURL(
+                service="twitter",
+                width=self.original_info.width,
+                height=self.original_info.height,
+                filename=filename,
+                content_type=content_type,
+                url=url,
+                alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
+                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+            )
+
+            return base.Attachment(
+                service="twitter",
+                thumbnail=attachment_urls["thumbnail"],
+                small=attachment_urls["small"],
+                medium=attachment_urls["medium"],
+                large=attachment_urls["large"],
+                original=attachment_urls["original"],
+            )
+        else:
+            warnings.warn(f"Unknown twitter media type: {self.type}")
+            return base.Attachment(
+                service="twitter",
+                original=base.AttachmentURL(
+                    service="twitter",
+                    url=self.media_url_https,
+                ),
+            )
+
 
 class TweetEntities(pydantic.BaseModel):
     """Entities in a tweet."""
@@ -256,9 +311,108 @@ class TwitterMedia(pydantic.BaseModel):
     additional_media_info: TwitterMediaExtraInfo | None
     """IDK."""
 
+    def to_universal(self) -> base.Attachment:
+        """Convert to universal attachment."""
+        if self.type == "photo":
+            filename = self.media_url_https.split("/")[-1]
+            content_type = "image/jpeg"
+
+            attachment_urls: dict[str, base.AttachmentURL] = {}
+            for size in ("thumb", "small", "medium", "large"):
+                size_name = {"thumb": "thumbnail"}.get(size, size)
+                url = self.media_url_https + ":" + size
+                attachment_urls[size_name] = base.AttachmentURL(
+                    service="twitter",
+                    width=self.sizes.__getattribute__(size).w,
+                    height=self.sizes.__getattribute__(size).h,
+                    filename=filename,
+                    content_type=content_type,
+                    url=url,
+                    alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
+                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+                )
+
+            url = self.media_url_https + ":orig"
+            attachment_urls["original"] = base.AttachmentURL(
+                service="twitter",
+                width=self.original_info.width,
+                height=self.original_info.height,
+                filename=filename,
+                content_type=content_type,
+                url=url,
+                alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
+                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+            )
+
+            return base.Attachment(
+                service="twitter",
+                thumbnail=attachment_urls["thumbnail"],
+                small=attachment_urls["small"],
+                medium=attachment_urls["medium"],
+                large=attachment_urls["large"],
+                original=attachment_urls["original"],
+            )
+        elif self.type == "video":
+            assert self.video_info
+            attachment_urls: dict[str, base.AttachmentURL] = {}
+            variants = sorted(self.video_info.variants, key=lambda v: v.bitrate or 0)
+            for size, variant in zip(("m3u8", "small", "medium", "large"), variants):
+                filename = variant.url.rsplit("?", 1)[0].split("/")[-1]
+                if size == "m3u8":
+                    attachment_urls["metadata"] = base.AttachmentURL(
+                        service="twitter",
+                        filename=filename,
+                        content_type=variant.content_type,
+                        url=variant.url,
+                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{urllib.parse.quote(variant.url, safe='')}",
+                        routed_url=f"/resources/twitter/{urllib.parse.quote(variant.url, safe='')}",
+                    )
+                else:
+                    attachment_urls[size] = base.AttachmentURL(
+                        service="twitter",
+                        width=self.sizes.__getattribute__(size).w,
+                        height=self.sizes.__getattribute__(size).h,
+                        duration=self.video_info.duration_millis / 1000,
+                        filename=filename,
+                        content_type=variant.content_type,
+                        url=variant.url,
+                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{urllib.parse.quote(variant.url, safe='')}",
+                        routed_url=f"/resources/twitter/{urllib.parse.quote(variant.url, safe='')}",
+                    )
+
+            attachment_urls["thumbnail"] = base.AttachmentURL(
+                service="twitter",
+                width=self.sizes.thumb.w,
+                height=self.sizes.thumb.h,
+                filename=self.media_url_https.split("/")[-1],
+                content_type="image/jpeg",
+                url=self.media_url_https,
+                alt_url=f"https://nitter.net/pic/{urllib.parse.quote(self.media_url_https.split('com/', 1)[1], safe='')}",
+                routed_url=f"/resources/twitter/{urllib.parse.quote(self.media_url_https, safe='')}",
+            )
+
+            return base.Attachment(
+                service="twitter",
+                thumbnail=attachment_urls["thumbnail"],
+                small=attachment_urls["small"],
+                medium=attachment_urls["medium"],
+                large=attachment_urls["large"],
+                metadata=attachment_urls["metadata"],
+                original=attachment_urls["large"],
+            )
+        else:
+            warnings.warn(f"Unknown twitter media type: {self.type}")
+            return base.Attachment(
+                service="twitter",
+                original=base.AttachmentURL(
+                    service="twitter",
+                    url=self.media_url_https,
+                ),
+            )
+
 
 class TweetExtendedEntities(pydantic.BaseModel):
-    """Extended entities in a tweet."""
+    """Extended entities in a tweet directly uploaded to twitter."""
 
     media: collections.abc.Sequence[TwitterMedia]
     """Media entities."""
@@ -409,8 +563,58 @@ class TwitterUser(pydantic.BaseModel):
 
     def to_universal(self) -> base.User:
         """Convert the Twitter user to a universal user."""
+        avatar_urls: dict[str, base.AttachmentURL] = {}
+        for size, name, width in [
+            ("mini", "small", 24),
+            ("normal", "medium", 48),
+            ("bigger", "large", 73),
+            ("", "original", None),
+        ]:
+            url = self.profile_image_url_https.replace("_normal", f"_{size}" if size else "")
+            avatar_urls[name] = base.AttachmentURL(
+                service="twitter",
+                width=width,
+                height=width,
+                filename=url.split("/")[-1],
+                content_type="image/png",
+                url=url,
+                alt_url=f"https://nitter.net/pic/{urllib.parse.quote(url.split('//', 1)[1])}",
+                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+            )
+
+        banner_urls: dict[str, base.AttachmentURL] = {}
+        if self.profile_banner_url:
+            for name, width, height in [
+                ("small", 300, 100),
+                ("medium", 600, 200),
+                ("large", 1500, 500),
+            ]:
+                url = self.profile_banner_url + f"/{width}x{height}"
+                banner_urls[name] = base.AttachmentURL(
+                    service="twitter",
+                    width=width,
+                    height=height,
+                    filename=url.split("/")[-2] + ".jpg",
+                    content_type="image/jpeg",
+                    url=url,
+                    alt_url=f"https://nitter.net/pic/{urllib.parse.quote(url)}",
+                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+                )
+
+        mentioned_urls: list[str] = []
+        if self.entities.url:
+            for url in self.entities.url.urls:
+                mentioned_urls.append(url.expanded_url)
+        if self.entities.description:
+            for url in self.entities.description.urls:
+                mentioned_urls.append(url.expanded_url)
+
         return base.User(
             service="twitter",
+            created_at=datetime.datetime.fromtimestamp(
+                ((self.id >> 22) + 1288834974657) / 1000,
+                tz=datetime.timezone.utc,
+            ),
             id=self.id_str,
             name=self.name,
             unique_name=self.screen_name,
@@ -419,23 +623,24 @@ class TwitterUser(pydantic.BaseModel):
             alt_url=f"https://nitter.net/{self.screen_name}",
             avatar=base.Attachment(
                 service="twitter",
-                original=base.AttachmentURL(
-                    service="twitter",
-                    url=self.profile_image_url_https,  # TODO: nitter
-                ),
+                small=avatar_urls["small"],
+                medium=avatar_urls["medium"],
+                large=avatar_urls["large"],
+                original=avatar_urls["original"],
             ),
             banner=base.Attachment(
                 service="twitter",
-                original=base.AttachmentURL(
-                    service="twitter",
-                    url=self.profile_banner_url,  # TODO: nitter
-                ),
+                small=banner_urls["small"],
+                medium=banner_urls["medium"],
+                large=banner_urls["large"],
+                original=banner_urls["large"],  # likely not stored
             )
-            if self.profile_banner_url
+            if banner_urls
             else None,
             followers=self.followers_count,
-            connections=[],  # TODO
-            tags=[],  # TODO
+            connections=[],  # TODO: Detect connections from mentions
+            mentions=[base.Mention(url=url) for url in mentioned_urls],
+            tags=[base.Tag(service="twitter", name=hashtag) for hashtag in re.findall(r"#(\w+)", self.description)],
             language=None,  # TODO
             following=self.following,
         )
@@ -450,10 +655,12 @@ class Tweet(pydantic.BaseModel):
     """The ID of the tweet."""
     id_str: str
     """The ID of the tweet as a string."""
-    text: str
+    full_text: str
     """The content of the tweet."""
     truncated: bool
     """Whether the tweet content is truncated."""
+    display_text_range: tuple[int, int]
+    """The range of the tweet content that is displayed in compact mode."""
     entities: TweetEntities
     """The special entities of the tweet."""
     extended_entities: TweetExtendedEntities | None
@@ -497,7 +704,7 @@ class Tweet(pydantic.BaseModel):
     possibly_sensitive: bool | None
     """Whether the tweet is possibly sensitive."""
     possibly_sensitive_editable: bool | None
-    """Whether the tweet sensitivity is not precisely known."""
+    """IDK."""
     lang: str
     """Language of the tweet."""
     supplemental_language: object | None
@@ -507,49 +714,25 @@ class Tweet(pydantic.BaseModel):
         """Convert the tweet to a post."""
         assert self.user
 
+        found_urls: list[str] = []
         attachments: list[base.Attachment] = []
-        if self.entities.media:
-            # links to the media
-            for media in self.entities.media:
-                attachments.append(
-                    base.Attachment(
-                        service="twitter",
-                        thumbnail=base.AttachmentURL(
-                            service="twitter",
-                            width=media.sizes.thumb.w,
-                            height=media.sizes.thumb.h,
-                            url=media.media_url_https,  # TODO: nitter
-                        ),
-                        original=base.AttachmentURL(
-                            service="twitter",
-                            width=media.sizes.large.w,
-                            height=media.sizes.large.h,
-                            url=media.expanded_url,  # TODO: nitter
-                        ),
-                    )
-                )
         if self.extended_entities and self.extended_entities.media:
             # attached media
             for media in self.extended_entities.media:
-                attachments.append(
-                    base.Attachment(
-                        service="twitter",
-                        thumbnail=base.AttachmentURL(
-                            service="twitter",
-                            width=media.sizes.thumb.w,
-                            height=media.sizes.thumb.h,
-                            url=media.media_url_https,  # TODO: nitter
-                            alt_url="huh",
-                        ),
-                        original=base.AttachmentURL(
-                            service="twitter",
-                            width=media.sizes.large.w,
-                            height=media.sizes.large.h,
-                            url=media.expanded_url,  # TODO: nitter
-                            alt_url="huh",
-                        ),
-                    )
-                )
+                found_urls.append(media.url)
+                attachments.append(media.to_universal())
+
+        if self.entities.media:
+            # links to the media
+            for media in self.entities.media:
+                # attached, no need for less info
+                if media.url in found_urls:
+                    continue
+                # thumbnail to an extended entity
+                if "http://pbs.twimg.com/ext_tw_video_thumb" in media.media_url:
+                    continue
+
+                attachments.append(media.to_universal())
 
         return base.Post(
             service="twitter",
@@ -560,16 +743,13 @@ class Tweet(pydantic.BaseModel):
             id=self.id_str,
             url=f"https://twitter.com/{self.user.screen_name}/status/{self.id_str}",
             alt_url=f"https://nitter.net/{self.user.screen_name}/status/{self.id_str}",
-            title=self.text.rsplit("…", 1)[0] + "…" if self.truncated else self.text,
-            description=None,
+            title=None,
+            description=self.full_text.rsplit(" ", 1)[0],
             attachments=attachments,
             tags=[base.Tag(service="twitter", name=hashtag.text) for hashtag in self.entities.hashtags],
             author=self.user.to_universal(),
-            connections=[
-                base.Connection(url=url.expanded_url)
-                for url in self.entities.urls
-                if "twitter.com" not in url.expanded_url
-            ],
+            connections=[],  # TODO: No viable connections to Twitter posts
+            mentions=[base.Mention(url=url.expanded_url) for url in self.entities.urls],
             nsfw=self.possibly_sensitive or None,
             language=self.lang,
             liked=self.favorited,

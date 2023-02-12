@@ -11,7 +11,7 @@ from atuyka.services import base
 from . import models
 
 # https://github.com/KohnoseLami/Twitter_Frontend_API
-# TOOD: use graphql for more detailed information
+# https://github.com/p1atdev/whisper
 
 UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 GUEST_AUTHORIZATION = (
@@ -148,8 +148,6 @@ class Twitter(base.ServiceClient):
         count: int | None = None,
         since_id: int | None = None,
         max_id: int | None = None,
-        include_entities: str | None = None,
-        tweet_mode: str | None = None,
     ) -> collections.abc.Sequence[models.Tweet]:
         """Get the favorites of a user."""
         url = "https://api.twitter.com/1.1/favorites/list.json"
@@ -158,8 +156,8 @@ class Twitter(base.ServiceClient):
             count=count,
             since_id=since_id,
             max_id=max_id,
-            include_entities=include_entities,
-            tweet_mode=tweet_mode,
+            include_entities="true",
+            tweet_mode="extended",
         )
         data = await self.request(url, params=params)
         return pydantic.parse_obj_as(collections.abc.Sequence[models.Tweet], data)
