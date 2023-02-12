@@ -2,7 +2,6 @@
 import collections.abc
 import datetime
 import re
-import urllib.parse
 import warnings
 
 import pydantic
@@ -164,7 +163,6 @@ class TwitterMediaEntity(pydantic.BaseModel):
                     content_type=content_type,
                     url=url,
                     alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
-                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
                 )
 
             url = self.media_url_https + ":orig"
@@ -176,7 +174,6 @@ class TwitterMediaEntity(pydantic.BaseModel):
                 content_type=content_type,
                 url=url,
                 alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
-                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
             )
 
             return base.Attachment(
@@ -329,7 +326,6 @@ class TwitterMedia(pydantic.BaseModel):
                     content_type=content_type,
                     url=url,
                     alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
-                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
                 )
 
             url = self.media_url_https + ":orig"
@@ -341,7 +337,6 @@ class TwitterMedia(pydantic.BaseModel):
                 content_type=content_type,
                 url=url,
                 alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
-                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
             )
 
             return base.Attachment(
@@ -364,8 +359,7 @@ class TwitterMedia(pydantic.BaseModel):
                         filename=filename,
                         content_type=variant.content_type,
                         url=variant.url,
-                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{urllib.parse.quote(variant.url, safe='')}",
-                        routed_url=f"/resources/twitter/{urllib.parse.quote(variant.url, safe='')}",
+                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{base.quote_url(variant.url)}",
                     )
                 else:
                     attachment_urls[size] = base.AttachmentURL(
@@ -376,8 +370,7 @@ class TwitterMedia(pydantic.BaseModel):
                         filename=filename,
                         content_type=variant.content_type,
                         url=variant.url,
-                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{urllib.parse.quote(variant.url, safe='')}",
-                        routed_url=f"/resources/twitter/{urllib.parse.quote(variant.url, safe='')}",
+                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{base.quote_url(variant.url)}",
                     )
 
             attachment_urls["thumbnail"] = base.AttachmentURL(
@@ -387,8 +380,7 @@ class TwitterMedia(pydantic.BaseModel):
                 filename=self.media_url_https.split("/")[-1],
                 content_type="image/jpeg",
                 url=self.media_url_https,
-                alt_url=f"https://nitter.net/pic/{urllib.parse.quote(self.media_url_https.split('com/', 1)[1], safe='')}",
-                routed_url=f"/resources/twitter/{urllib.parse.quote(self.media_url_https, safe='')}",
+                alt_url=f"https://nitter.net/pic/{base.quote_url(self.media_url_https.split('com/', 1)[1])}",
             )
 
             return base.Attachment(
@@ -578,8 +570,7 @@ class TwitterUser(pydantic.BaseModel):
                 filename=url.split("/")[-1],
                 content_type="image/png",
                 url=url,
-                alt_url=f"https://nitter.net/pic/{urllib.parse.quote(url.split('//', 1)[1])}",
-                routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+                alt_url=f"https://nitter.net/pic/{base.quote_url(url, protocol=False)}",
             )
 
         banner_urls: dict[str, base.AttachmentURL] = {}
@@ -597,8 +588,7 @@ class TwitterUser(pydantic.BaseModel):
                     filename=url.split("/")[-2] + ".jpg",
                     content_type="image/jpeg",
                     url=url,
-                    alt_url=f"https://nitter.net/pic/{urllib.parse.quote(url)}",
-                    routed_url=f"/resources/twitter/{urllib.parse.quote(url, safe='')}",
+                    alt_url=f"https://nitter.net/pic/{base.quote_url(url)}",
                 )
 
         mentioned_urls: list[str] = []
@@ -745,6 +735,7 @@ class Tweet(pydantic.BaseModel):
             alt_url=f"https://nitter.net/{self.user.screen_name}/status/{self.id_str}",
             title=None,
             description=self.full_text.rsplit(" ", 1)[0],
+            likes=self.favorite_count,
             attachments=attachments,
             tags=[base.Tag(service="twitter", name=hashtag.text) for hashtag in self.entities.hashtags],
             author=self.user.to_universal(),

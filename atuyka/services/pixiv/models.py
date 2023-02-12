@@ -4,7 +4,6 @@ import datetime
 import mimetypes
 import re
 import typing
-import urllib.parse
 
 import pydantic
 import pydantic.generics
@@ -55,7 +54,6 @@ class PixivImageURLs(pydantic.BaseModel):
                 content_type=mimetypes.guess_type(url)[0],
                 url=url,
                 alt_url=_to_alt_image(url),
-                routed_url=url,
             )
 
         return base.Attachment(
@@ -113,7 +111,6 @@ class PixivIllustAuthor(pydantic.BaseModel):
                     content_type="image/jpeg",
                     url=self.profile_image_urls.medium,
                     alt_url=_to_alt_image(self.profile_image_urls.medium),
-                    routed_url=f"/resources/pixiv/{urllib.parse.quote(self.profile_image_urls.medium, safe='')}",
                 ),
             ),
             connections=[],  # TODO: Detect connections from mentions
@@ -210,6 +207,8 @@ class PixivIllust(pydantic.BaseModel):
             alt_url=f"https://www.pixiv.moe/illust/{self.id}",
             title=self.title,
             description=self.caption,
+            views=self.total_view,
+            likes=self.total_bookmarks,
             attachments=[url.to_universal() for url in urls],
             tags=[base.Tag(service="pixiv", name=tag.name, localized_name=tag.translated_name) for tag in self.tags],
             author=self.user.to_universal(),

@@ -5,7 +5,6 @@ import urllib.parse
 
 import pixivpy_async as pixivpy
 import pydantic
-import typing_extensions
 
 from atuyka.services import base
 
@@ -64,13 +63,6 @@ class Pixiv(base.ServiceClient):
         """Close the client."""
         await asyncio.sleep(0)
         await self.client.client.close()
-
-    async def __aenter__(self) -> typing_extensions.Self:
-        await self.start()
-        return self
-
-    async def __aexit__(self, *exc: typing.Any) -> None:
-        await self.close()
 
     async def get_user_bookmarks(
         self,

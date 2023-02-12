@@ -2,10 +2,29 @@
 import collections.abc
 import datetime
 import typing
+import urllib.parse
 
 import pydantic
 
 T = typing.TypeVar("T")
+
+
+def quote_url(url: str, *, safe: str = "", protocol: bool = True) -> str:
+    """Quote a URL."""
+    if not protocol:
+        url = url.split("://", 1)[1]
+
+    return urllib.parse.quote(url, safe)
+
+
+def get_filename(url: str) -> str:
+    """Get the filename from a URL."""
+    return url.split("/")[-1]
+
+
+def to_routed_url(service: str, url: str) -> str:
+    """Convert a URL to a routed URL."""
+    return "/resources/" + service + "/" + quote_url(url)
 
 
 class Connection(pydantic.BaseModel):
@@ -53,6 +72,12 @@ class AttachmentURL(pydantic.BaseModel):
     """The relative routed attachment URL."""
     alt_url: str | None = None
     """Link to the attachment on an alternative front-end of the service."""
+
+    @pydantic.root_validator()
+    def __add_routed_url(cls, values: dict[str, typing.Any]) -> dict[str, typing.Any]:
+        """Add the routed URL."""
+        values["routed_url"] = to_routed_url(values["service"], values["url"])
+        return values
 
 
 class Attachment(pydantic.BaseModel):
@@ -152,6 +177,12 @@ class Post(pydantic.BaseModel):
     """The post title."""
     description: str | None = None
     """The post description."""
+    views: int | None = None
+    """The amount of views."""
+    likes: int | None = None
+    """The amount of likes."""
+    comments: int | None = None
+    """The amount of comments."""
     attachments: collections.abc.Sequence[Attachment]
     """The post attachments."""
     tags: collections.abc.Sequence[Tag]

@@ -82,6 +82,19 @@ def endpoint(callback: CallableT) -> CallableT:
 class ServiceClient(abc.ABC):
     """Base service client."""
 
+    async def start(self) -> None:
+        """Start the client."""
+
+    async def close(self) -> None:
+        """Close the client."""
+
+    async def __aenter__(self) -> typing_extensions.Self:
+        await self.start()
+        return self
+
+    async def __aexit__(self, *exc: typing.Any) -> None:
+        await self.close()
+
     @abc.abstractmethod
     async def get_recommended_posts(self) -> models.Page[models.Post]:
         """Get recommended posts."""
