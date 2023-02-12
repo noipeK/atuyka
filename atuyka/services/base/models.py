@@ -101,7 +101,7 @@ class User(pydantic.BaseModel):
     service: str
     """The service name."""
 
-    created_at: datetime.datetime
+    created_at: datetime.datetime | None = None
     """The user creation date."""
     id: str
     """The unique author ID."""

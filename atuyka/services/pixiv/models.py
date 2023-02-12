@@ -1,12 +1,22 @@
 """Pixiv API models."""
 import collections.abc
 import datetime
+import mimetypes
+import re
 import typing
 import urllib.parse
 
 import pydantic
+import pydantic.generics
+
+from atuyka.services.base import models as base
 
 T = typing.TypeVar("T")
+
+
+def _to_alt_image(url: str) -> str:
+    """Convert a pixiv image URL to an alternative image URL."""
+    return "https://api.pixiv.moe/image/" + url.split("//", 1)[1]
 
 
 class PixivImageURLs(pydantic.BaseModel):
@@ -18,6 +28,43 @@ class PixivImageURLs(pydantic.BaseModel):
     """The medium image URL."""
     large: str | None
     """The large image URL."""
+
+    def to_universal(self) -> base.Attachment:
+        """Convert to a universal attachment URL."""
+        urls: dict[str, base.AttachmentURL | None] = {}
+        for size, url in [
+            ("thumbnail", self.square_medium),
+            ("medium", self.medium),
+            ("large", self.large),
+        ]:
+            if url is None:
+                urls[size] = None
+                continue
+
+            match = re.search(r"(\d+)x(\d+)", url)
+            if match:
+                width, height = int(match[1]), int(match[2])
+            else:
+                width, height = None, None
+
+            urls[size] = base.AttachmentURL(
+                service="pixiv",
+                width=width,
+                height=height,
+                filename=url.split("/")[-1],
+                content_type=mimetypes.guess_type(url)[0],
+                url=url,
+                alt_url=_to_alt_image(url),
+                routed_url=url,
+            )
+
+        return base.Attachment(
+            service="pixiv",
+            thumbnail=urls["thumbnail"],
+            medium=urls["medium"],
+            large=urls["large"],
+            original=urls["large"] or urls["medium"],  # pyright: ignore
+        )
 
 
 class PixivIllustSingleMetaImageURLs(pydantic.BaseModel):
@@ -34,8 +81,8 @@ class PixivIllustMeta(pydantic.BaseModel):
     """The illustration thumbnail URLs."""
 
 
-class PixivUser(pydantic.BaseModel):
-    """A pixiv user."""
+class PixivIllustAuthor(pydantic.BaseModel):
+    """A pixiv illust author."""
 
     id: int
     """The user ID."""
@@ -47,6 +94,33 @@ class PixivUser(pydantic.BaseModel):
     """The user profile image URLs."""
     is_followed: bool
     """Whether the user is being followed by the authenticated user."""
+
+    def to_universal(self) -> base.User:
+        """Convert to a universal user."""
+        return base.User(
+            service="pixiv",
+            created_at=None,
+            id=str(self.id),
+            name=self.name,
+            unique_name=self.account,
+            url=f"https://www.pixiv.net/users/{self.id}",
+            alt_url=f"https://www.pixiv.moe/user/{self.id}",
+            avatar=base.Attachment(
+                service="pixiv",
+                original=base.AttachmentURL(
+                    service="pixiv",
+                    filename=self.profile_image_urls.medium.split("/")[-1],
+                    content_type="image/jpeg",
+                    url=self.profile_image_urls.medium,
+                    alt_url=_to_alt_image(self.profile_image_urls.medium),
+                    routed_url=f"/resources/pixiv/{urllib.parse.quote(self.profile_image_urls.medium, safe='')}",
+                ),
+            ),
+            connections=[],  # TODO: Detect connections from mentions
+            mentions=[],  # no bio
+            tags=[],  # no bio
+            following=self.is_followed,
+        )
 
 
 class PixivTag(pydantic.BaseModel):
@@ -82,7 +156,7 @@ class PixivIllust(pydantic.BaseModel):
     """The illustration caption in html."""
     restrict: bool
     """IDK."""
-    user: PixivUser
+    user: PixivIllustAuthor
     """The illustration author."""
     tags: collections.abc.Sequence[PixivTag]
     """The illustration tags."""
@@ -121,19 +195,35 @@ class PixivIllust(pydantic.BaseModel):
     illust_book_style: bool
     """IDK."""
 
+    def to_universal(self) -> base.Post:
+        """Convert the illust to a universal post."""
+        if self.meta_pages:
+            urls = [meta.image_urls for meta in self.meta_pages]
+        else:
+            urls = [self.image_urls]
 
-class PixivPaginatedResource(pydantic.BaseModel, typing.Generic[T]):
+        return base.Post(
+            service="pixiv",
+            created_at=self.create_date,
+            id=str(self.id),
+            url=f"https://www.pixiv.net/artworks/{self.id}",
+            alt_url=f"https://www.pixiv.moe/illust/{self.id}",
+            title=self.title,
+            description=self.caption,
+            attachments=[url.to_universal() for url in urls],
+            tags=[base.Tag(service="pixiv", name=tag.name, localized_name=tag.translated_name) for tag in self.tags],
+            author=self.user.to_universal(),
+            connections=[],  # TODO: Detect connections from mentions
+            mentions=[base.Mention(url=url) for url in re.findall(r"https?://[^\s]+", self.title + " " + self.caption)],
+            nsfw=self.sanity_level > 1,  # TODO: Figure this out precisely
+            liked=self.is_bookmarked,
+        )
+
+
+class PixivPaginatedResource(pydantic.generics.GenericModel, typing.Generic[T]):
     """Pixiv paginated resource."""
 
     illusts: collections.abc.Sequence[T]
     """The illustrations."""
     next_url: str | None
     """The next page URL."""
-
-    @property
-    def next_params(self) -> dict[str, str] | None:
-        """The next page parameters."""
-        if self.next_url is None:
-            return None
-
-        return dict(urllib.parse.parse_qsl(urllib.parse.urlparse(self.next_url).query))

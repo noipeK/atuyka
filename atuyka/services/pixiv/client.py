@@ -1,6 +1,7 @@
 """Pixiv client."""
 import asyncio
 import typing
+import urllib.parse
 
 import pixivpy_async as pixivpy
 import pydantic
@@ -19,12 +20,15 @@ class Pixiv(base.ServiceClient):
     """Pixiv client."""
 
     token: str | None
+    my_id: int | None
+
     client: pixivpy.PixivClient
     api: pixivpy.AppPixivAPI
 
     def __init__(
         self,
         token: str | None,
+        my_id: int | None = None,
         language: str = "en",
         *,
         limit: int = 30,
@@ -35,6 +39,7 @@ class Pixiv(base.ServiceClient):
         bypass: bool = False,
     ) -> None:
         self.token = token
+        self.my_id = my_id
 
         self.client = pixivpy.PixivClient(
             limit=limit,
@@ -69,13 +74,16 @@ class Pixiv(base.ServiceClient):
 
     async def get_user_bookmarks(
         self,
-        user: int,
+        user: int | None = None,
         restrict: str = "public",
         filter: str = "for_ios",
         max_bookmark_id: int | None = None,
         tag: str | None = None,
     ) -> models.PixivPaginatedResource[models.PixivIllust]:
         """Get user bookmarks."""
+        user = user or self.my_id
+        assert user
+
         data = await self.api.user_bookmarks_illust(
             user,
             restrict=restrict,
@@ -88,13 +96,16 @@ class Pixiv(base.ServiceClient):
 
     async def get_user_illusts(
         self,
-        user: int,
+        user: int | None = None,
         type: str = "illust",
         filter: str = "for_ios",
         offset: int | None = None,
         req_auth: bool = True,
     ) -> models.PixivPaginatedResource[models.PixivIllust]:
         """Get user illusts."""
+        user = user or self.my_id
+        assert user
+
         data = await self.api.user_illusts(  # pyright: reportUnknownVariableType=false
             user,
             type=type,
@@ -116,9 +127,31 @@ class Pixiv(base.ServiceClient):
         """Get posts made by followed users."""
         raise NotImplementedError
 
-    async def get_liked_posts(self) -> typing.NoReturn:
-        """Get liked posts."""
-        raise NotImplementedError
+    async def get_liked_posts(
+        self,
+        user: int | None = None,
+        *,
+        max_bookmark_id: int | None = None,
+    ) -> base.models.Page[base.models.Post]:
+        """Get bookmarked illusts.
+
+        Parameters
+        ----------
+        user : int
+            ID of the user. The authenticated user by default.
+        """
+        illusts = await self.get_user_bookmarks(user, max_bookmark_id=max_bookmark_id)
+        posts = [illust.to_universal() for illust in illusts.illusts]
+
+        if illusts.next_url:
+            parsed = urllib.parse.urlparse(illusts.next_url)
+            query = dict(urllib.parse.parse_qsl(parsed.query))
+            next_query = dict(max_bookmark_id=int(query["max_bookmark_id"]))
+        else:
+            next_query = None
+
+        page = base.models.Page(items=posts, next=next_query)
+        return page
 
     async def get_author_posts(self) -> typing.NoReturn:
         """Get posts made by an author."""

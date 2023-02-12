@@ -232,6 +232,7 @@ class Twitter(base.ServiceClient):
         """
         tweets = await self.get_favorites(screen_name, since_id=since_id, max_id=max_id)
         posts = [tweet.to_universal() for tweet in tweets]
+
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
         return page
 
