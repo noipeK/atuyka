@@ -19,7 +19,6 @@ class Pixiv(base.ServiceClient):
     """Pixiv client."""
 
     token: str | None
-    my_id: int | None
 
     client: pixivpy.PixivClient
     api: pixivpy.AppPixivAPI
@@ -27,9 +26,8 @@ class Pixiv(base.ServiceClient):
     def __init__(
         self,
         token: str | None,
-        my_id: int | None = None,
-        language: str = "en",
         *,
+        language: str = "en",
         limit: int = 30,
         timeout: int = 10,
         env: bool = False,
@@ -38,7 +36,6 @@ class Pixiv(base.ServiceClient):
         bypass: bool = False,
     ) -> None:
         self.token = token
-        self.my_id = my_id
 
         self.client = pixivpy.PixivClient(
             limit=limit,
@@ -64,6 +61,11 @@ class Pixiv(base.ServiceClient):
         await asyncio.sleep(0)
         await self.client.client.close()
 
+    @property
+    def user_id(self) -> int:
+        """Authenticated user ID."""
+        return self.api.user_id  # pyright: reportUnknownMemberType=false
+
     async def get_user_bookmarks(
         self,
         user: int | None = None,
@@ -73,7 +75,7 @@ class Pixiv(base.ServiceClient):
         tag: str | None = None,
     ) -> models.PixivPaginatedResource[models.PixivIllust]:
         """Get user bookmarks."""
-        user = user or self.my_id
+        user = user or self.user_id
         assert user
 
         data = await self.api.user_bookmarks_illust(
@@ -95,7 +97,7 @@ class Pixiv(base.ServiceClient):
         req_auth: bool = True,
     ) -> models.PixivPaginatedResource[models.PixivIllust]:
         """Get user illusts."""
-        user = user or self.my_id
+        user = user or self.user_id
         assert user
 
         data = await self.api.user_illusts(  # pyright: reportUnknownVariableType=false
@@ -111,28 +113,22 @@ class Pixiv(base.ServiceClient):
     # ------------------------------------------------------------
     # UNIVERSAL:
 
-    async def get_recommended_posts(self) -> typing.NoReturn:
-        """Get recommended posts."""
-        raise NotImplementedError
-
-    async def get_following_posts(self) -> typing.NoReturn:
-        """Get posts made by followed users."""
+    async def get_user(self, user: str | None = ...) -> typing.NoReturn:
+        """Get user."""
         raise NotImplementedError
 
     async def get_liked_posts(
         self,
-        user: int | None = None,
+        user: str | None = None,
         *,
         max_bookmark_id: int | None = None,
     ) -> base.models.Page[base.models.Post]:
-        """Get bookmarked illusts.
+        """Get bookmarked illusts."""
+        if isinstance(user, str) and not user.isdigit():
+            raise ValueError("Invalid user ID")
 
-        Parameters
-        ----------
-        user : int
-            ID of the user. The authenticated user by default.
-        """
-        illusts = await self.get_user_bookmarks(user, max_bookmark_id=max_bookmark_id)
+        user_id = int(user) if user else self.user_id
+        illusts = await self.get_user_bookmarks(user_id, max_bookmark_id=max_bookmark_id)
         posts = [illust.to_universal() for illust in illusts.illusts]
 
         if illusts.next_url:
@@ -145,14 +141,38 @@ class Pixiv(base.ServiceClient):
         page = base.models.Page(items=posts, next=next_query)
         return page
 
-    async def get_author_posts(self) -> typing.NoReturn:
-        """Get posts made by an author."""
+    async def get_following(self, user: str | None = ...) -> typing.NoReturn:
+        """Get following users."""
         raise NotImplementedError
 
-    async def search_posts(self) -> typing.NoReturn:
+    async def get_followers(self, user: str | None = ...) -> typing.NoReturn:
+        """Get followers."""
+        raise NotImplementedError
+
+    async def get_posts(self, user: str) -> typing.NoReturn:
+        """Get posts made by a user."""
+        raise NotImplementedError
+
+    async def get_post(self, user: str, post: str) -> typing.NoReturn:
+        """Get a post."""
+        raise NotImplementedError
+
+    async def get_similar_posts(self, user: str, post: str) -> typing.NoReturn:
+        """Get similar posts."""
+        raise NotImplementedError
+
+    async def get_following_feed(self, user: str | None = ...) -> typing.NoReturn:
+        """Get posts made by followed users."""
+        raise NotImplementedError
+
+    async def get_recommended_feed(self, user: str | None = ...) -> typing.NoReturn:
+        """Get recommended posts."""
+        raise NotImplementedError
+
+    async def search_posts(self, query: str | None = ...) -> typing.NoReturn:
         """Search posts."""
         raise NotImplementedError
 
-    async def search_authors(self) -> typing.NoReturn:
-        """Search authors."""
+    async def search_users(self, query: str | None = ...) -> typing.NoReturn:
+        """Search users."""
         raise NotImplementedError

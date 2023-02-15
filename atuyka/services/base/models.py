@@ -5,6 +5,7 @@ import typing
 import urllib.parse
 
 import pydantic
+import pydantic.generics
 
 T = typing.TypeVar("T")
 
@@ -202,7 +203,7 @@ class Post(pydantic.BaseModel):
     """Whether the post is liked by the authenticated user."""
 
 
-class Page(pydantic.BaseModel, typing.Generic[T]):
+class Page(pydantic.generics.GenericModel, typing.Generic[T]):
     """A page."""
 
     items: collections.abc.Sequence[T]

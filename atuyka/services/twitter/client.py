@@ -13,12 +13,13 @@ from . import models
 # https://github.com/KohnoseLami/Twitter_Frontend_API
 # https://github.com/p1atdev/whisper
 
-UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
+# This is not a private token
 GUEST_AUTHORIZATION = (
     "Bearer "
     + "AAAAAAAAAAAAAAAAAAAAAF7aAAAAAAAASCiRjWvh7R5wxaKkFp7MM%2BhYBqM="
     + "bQ0JPmjU9F6ZoMhDfI4uTNAaQuTDm2uO9x3WFVr2xBZ2nhjdP0"
 )
+UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 
 __all__ = ["Twitter"]
 
@@ -27,17 +28,17 @@ class Twitter(base.ServiceClient):
     """Twitter front-end API client."""
 
     auth_token: str | None
-    my_name: str
 
     ct0: str | None
     guest_token: str | None
     guest_authorization: str
     user_agent: str
 
+    my_screen_name: str | None
+
     def __init__(
         self,
         token: str | None = None,
-        my_name: str | None = None,
         *,
         ct0: str | None = None,
         guest_token: str | None = None,
@@ -45,12 +46,13 @@ class Twitter(base.ServiceClient):
         user_agent: str | None = None,
     ) -> None:
         self.auth_token = token
-        self.my_name = my_name or "twitter"
 
         self.ct0 = ct0
         self.guest_token = guest_token
         self.guest_authorization = guest_authorization or GUEST_AUTHORIZATION
         self.user_agent = user_agent or UA
+
+        self.my_screen_name = None
 
     async def _generate_guest_token(self) -> str:
         """Generate the token."""
@@ -141,6 +143,20 @@ class Twitter(base.ServiceClient):
 
         return data
 
+    async def _get_account_settings(self) -> dict[str, typing.Any]:
+        """Get the settings."""
+        url = "https://api.twitter.com/1.1/account/settings.json"
+        return await self.request(url)
+
+    async def _get_my_screen_name(self) -> str:
+        """Get the authenticated user screen name."""
+        if self.my_screen_name:
+            return self.my_screen_name
+
+        settings = await self._get_account_settings()
+        self.my_screen_name = settings["screen_name"]
+        return self.my_screen_name
+
     async def get_favorites(
         self,
         screen_name: str | None = None,
@@ -152,7 +168,7 @@ class Twitter(base.ServiceClient):
         """Get the favorites of a user."""
         url = "https://api.twitter.com/1.1/favorites/list.json"
         params = dict(
-            screen_name=screen_name or self.my_name,
+            screen_name=screen_name or await self._get_my_screen_name(),
             count=count,
             since_id=since_id,
             max_id=max_id,
@@ -175,7 +191,7 @@ class Twitter(base.ServiceClient):
         """Get the friends of a user."""
         url = "https://api.twitter.com/1.1/friends/list.json"
         params = dict(
-            screen_name=screen_name or self.my_name,
+            screen_name=screen_name or await self._get_my_screen_name(),
             cursor=cursor,
             count=count,
             skip_status=skip_status,
@@ -208,42 +224,56 @@ class Twitter(base.ServiceClient):
     # ------------------------------------------------------------
     # UNIVERSAL:
 
-    async def get_recommended_posts(self) -> typing.NoReturn:
-        """Get recommended posts."""
-        raise NotImplementedError
-
-    async def get_following_posts(self) -> typing.NoReturn:
-        """Get posts made by followed users."""
+    async def get_user(self, user: str | None = ...) -> typing.NoReturn:
+        """Get user."""
         raise NotImplementedError
 
     async def get_liked_posts(
         self,
-        screen_name: str | None = None,
+        user: str | None = None,
         *,
         since_id: int | None = None,
         max_id: int | None = None,
     ) -> base.models.Page[base.models.Post]:
-        """Get liked tweets.
-
-        Parameters
-        ----------
-        screen_name: str
-            The screen name of the user. The authenticated user by default.
-        """
-        tweets = await self.get_favorites(screen_name, since_id=since_id, max_id=max_id)
+        """Get liked posts."""
+        tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id)
         posts = [tweet.to_universal() for tweet in tweets]
 
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
         return page
 
-    async def get_author_posts(self) -> typing.NoReturn:
-        """Get posts made by an author."""
+    async def get_following(self, user: str | None = ...) -> typing.NoReturn:
+        """Get following users."""
         raise NotImplementedError
 
-    async def search_posts(self) -> typing.NoReturn:
+    async def get_followers(self, user: str | None = ...) -> typing.NoReturn:
+        """Get followers."""
+        raise NotImplementedError
+
+    async def get_posts(self, user: str) -> typing.NoReturn:
+        """Get posts made by a user."""
+        raise NotImplementedError
+
+    async def get_post(self, user: str, post: str) -> typing.NoReturn:
+        """Get a post."""
+        raise NotImplementedError
+
+    async def get_similar_posts(self, user: str, post: str) -> typing.NoReturn:
+        """Get similar posts."""
+        raise NotImplementedError
+
+    async def get_following_feed(self, user: str | None = ...) -> typing.NoReturn:
+        """Get posts made by followed users."""
+        raise NotImplementedError
+
+    async def get_recommended_feed(self, user: str | None = ...) -> typing.NoReturn:
+        """Get recommended posts."""
+        raise NotImplementedError
+
+    async def search_posts(self, query: str | None = ...) -> typing.NoReturn:
         """Search posts."""
         raise NotImplementedError
 
-    async def search_authors(self) -> typing.NoReturn:
-        """Search authors."""
+    async def search_users(self, query: str | None = ...) -> typing.NoReturn:
+        """Search users."""
         raise NotImplementedError

@@ -19,8 +19,6 @@ exclude = ["**/__init__.py", "tests/**"]
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportImportCycles = "none"
-reportIncompatibleMethodOverride = "none"  # This relies on ordering for keyword-only arguments
-reportIncompatibleVariableOverride = "none" 
 reportUnusedFunction = "none"  # Makes usage of validators impossible
 reportPrivateUsage = "none"
 

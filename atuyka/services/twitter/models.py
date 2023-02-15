@@ -555,6 +555,10 @@ class TwitterUser(pydantic.BaseModel):
 
     def to_universal(self) -> base.User:
         """Convert the Twitter user to a universal user."""
+        urls = {url.url: url.expanded_url for url in self.entities.description.urls}
+        bio = self.description.rsplit(" ", 1)[0]
+        bio = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), bio)
+
         avatar_urls: dict[str, base.AttachmentURL] = {}
         for size, name, width in [
             ("mini", "small", 24),
@@ -592,9 +596,6 @@ class TwitterUser(pydantic.BaseModel):
                 )
 
         mentioned_urls: list[str] = []
-        if self.entities.url:
-            for url in self.entities.url.urls:
-                mentioned_urls.append(url.expanded_url)
         if self.entities.description:
             for url in self.entities.description.urls:
                 mentioned_urls.append(url.expanded_url)
@@ -608,7 +609,7 @@ class TwitterUser(pydantic.BaseModel):
             id=self.id_str,
             name=self.name,
             unique_name=self.screen_name,
-            bio=self.description,
+            bio=bio,
             url=f"https://twitter.com/{self.screen_name}",
             alt_url=f"https://nitter.net/{self.screen_name}",
             avatar=base.Attachment(
@@ -704,6 +705,10 @@ class Tweet(pydantic.BaseModel):
         """Convert the tweet to a post."""
         assert self.user
 
+        urls = {url.url: url.expanded_url for url in self.entities.urls}
+        text = self.full_text.rsplit(" ", 1)[0]
+        text = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), text)
+
         found_urls: list[str] = []
         attachments: list[base.Attachment] = []
         if self.extended_entities and self.extended_entities.media:
@@ -734,7 +739,7 @@ class Tweet(pydantic.BaseModel):
             url=f"https://twitter.com/{self.user.screen_name}/status/{self.id_str}",
             alt_url=f"https://nitter.net/{self.user.screen_name}/status/{self.id_str}",
             title=None,
-            description=self.full_text.rsplit(" ", 1)[0],
+            description=text,
             likes=self.favorite_count,
             attachments=attachments,
             tags=[base.Tag(service="twitter", name=hashtag.text) for hashtag in self.entities.hashtags],

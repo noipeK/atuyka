@@ -2,4 +2,6 @@ typing_extensions
 aiohttp
 pydantic
 
+fastapi
+
 pixivpy-async
