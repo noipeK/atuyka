@@ -2,6 +2,7 @@ typing_extensions
 aiohttp
 pydantic
 
+starlette
 fastapi
 
 pixivpy-async

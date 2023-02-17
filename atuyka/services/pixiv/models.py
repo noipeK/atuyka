@@ -1,7 +1,6 @@
 """Pixiv API models."""
 import collections.abc
 import datetime
-import mimetypes
 import re
 import typing
 
@@ -21,37 +20,36 @@ def _to_alt_image(url: str) -> str:
 class PixivImageURLs(pydantic.BaseModel):
     """A pixiv image URLs."""
 
-    square_medium: str | None
+    square_medium: str
     """The square medium image URL."""
     medium: str
     """The medium image URL."""
-    large: str | None
+    large: str
     """The large image URL."""
 
     def to_universal(self) -> base.Attachment:
         """Convert to a universal attachment URL."""
-        urls: dict[str, base.AttachmentURL | None] = {}
-        for size, url in [
-            ("thumbnail", self.square_medium),
-            ("medium", self.medium),
-            ("large", self.large),
+        # TODO: implement videos
+
+        # https://i.pximg.net/img-original/img/2017/04/05/00/00/02/62258773_p0.png
+        # img/2017/04/05/00/00/02/62258773_p0
+        match = re.search(r"img(?:/\d+){6}/\d+_p(\d+)", self.medium)
+        assert match, self.medium
+        substring = match[0]
+
+        urls: dict[str, base.AttachmentURL] = {}
+        for size, (width, height), template in [
+            ("thumbnail", (540, 540), "https://i.pximg.net/c/540x540_10_webp/img-master/{}_square1200.jpg"),
+            ("small", (None, 540), "https://i.pximg.net/c/540x540_70/img-master/{}_master1200.jpg"),
+            ("medium", (None, None), "https://i.pximg.net/c/600x1200_90_webp/img-master/{}_master1200.jpg"),
+            ("large", (None, None), "https://i.pximg.net/img-master/{}_master1200.jpg"),
+            ("original", (None, None), "https://i.pximg.net/img-original/{}.png"),
         ]:
-            if url is None:
-                urls[size] = None
-                continue
-
-            match = re.search(r"(\d+)x(\d+)", url)
-            if match:
-                width, height = int(match[1]), int(match[2])
-            else:
-                width, height = None, None
-
+            url = template.format(substring)
             urls[size] = base.AttachmentURL(
                 service="pixiv",
                 width=width,
                 height=height,
-                filename=url.split("/")[-1],
-                content_type=mimetypes.guess_type(url)[0],
                 url=url,
                 alt_url=_to_alt_image(url),
             )
@@ -59,9 +57,33 @@ class PixivImageURLs(pydantic.BaseModel):
         return base.Attachment(
             service="pixiv",
             thumbnail=urls["thumbnail"],
+            small=urls["small"],
             medium=urls["medium"],
             large=urls["large"],
-            original=urls["large"] or urls["medium"],  # pyright: ignore
+            original=urls["original"],
+        )
+
+
+class PixivProfileImageURLs(pydantic.BaseModel):
+    """A pixiv profile image URLs."""
+
+    medium: str
+    """The medium image URL."""
+
+    def to_universal(self) -> base.Attachment:
+        """Convert to a universal attachment URL."""
+        return base.Attachment(
+            service="pixiv",
+            original=base.AttachmentURL(
+                service="pixiv",
+                url=self.medium,
+                alt_url=_to_alt_image(self.medium),
+            ),
+            small=base.AttachmentURL(
+                service="pixiv",
+                url=self.medium.replace("_170", "_50"),
+                alt_url=_to_alt_image(self.medium.replace("_170", "_50")),
+            ),
         )
 
 
@@ -88,7 +110,7 @@ class PixivIllustAuthor(pydantic.BaseModel):
     """The user name."""
     account: str
     """The user account name."""
-    profile_image_urls: PixivImageURLs
+    profile_image_urls: PixivProfileImageURLs
     """The user profile image URLs."""
     is_followed: bool
     """Whether the user is being followed by the authenticated user."""
@@ -103,16 +125,7 @@ class PixivIllustAuthor(pydantic.BaseModel):
             unique_name=self.account,
             url=f"https://www.pixiv.net/users/{self.id}",
             alt_url=f"https://www.pixiv.moe/user/{self.id}",
-            avatar=base.Attachment(
-                service="pixiv",
-                original=base.AttachmentURL(
-                    service="pixiv",
-                    filename=self.profile_image_urls.medium.split("/")[-1],
-                    content_type="image/jpeg",
-                    url=self.profile_image_urls.medium,
-                    alt_url=_to_alt_image(self.profile_image_urls.medium),
-                ),
-            ),
+            avatar=self.profile_image_urls.to_universal(),
             connections=[],  # TODO: Detect connections from mentions
             mentions=[],  # no bio
             tags=[],  # no bio
@@ -214,7 +227,7 @@ class PixivIllust(pydantic.BaseModel):
             author=self.user.to_universal(),
             connections=[],  # TODO: Detect connections from mentions
             mentions=[base.Mention(url=url) for url in re.findall(r"https?://[^\s]+", self.title + " " + self.caption)],
-            nsfw=self.sanity_level > 1,  # TODO: Figure this out precisely
+            nsfw=self.sanity_level > 4,  # TODO: Figure this out precisely
             liked=self.is_bookmarked,
         )
 

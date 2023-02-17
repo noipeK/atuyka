@@ -1,6 +1,7 @@
 """Universal models."""
 import collections.abc
 import datetime
+import mimetypes
 import typing
 import urllib.parse
 
@@ -75,9 +76,12 @@ class AttachmentURL(pydantic.BaseModel):
     """Link to the attachment on an alternative front-end of the service."""
 
     @pydantic.root_validator()
-    def __add_routed_url(cls, values: dict[str, typing.Any]) -> dict[str, typing.Any]:
+    def __complete_values(cls, values: dict[str, typing.Any]) -> dict[str, typing.Any]:
         """Add the routed URL."""
-        values["routed_url"] = to_routed_url(values["service"], values["url"])
+        values["filename"] = values.get("filename") or get_filename(values["url"])
+        values["content_type"] = values.get("content_type") or mimetypes.guess_type(values["url"])[0]
+        values["routed_url"] = values.get("routed_url") or to_routed_url(values["service"], values["url"])
+
         return values
 
 
@@ -147,11 +151,11 @@ class User(pydantic.BaseModel):
     """The author banner URL."""
     followers: int | None = None
     """The amount of followers."""
-    connections: collections.abc.Sequence[Connection]
+    connections: collections.abc.Sequence[Connection] = []
     """The author connections."""
-    mentions: collections.abc.Sequence[Mention]
+    mentions: collections.abc.Sequence[Mention] = []
     """The post mentions."""
-    tags: collections.abc.Sequence[Tag]
+    tags: collections.abc.Sequence[Tag] = []
     """The author tags."""
     language: str | None = None
     """The author language."""
@@ -184,15 +188,15 @@ class Post(pydantic.BaseModel):
     """The amount of likes."""
     comments: int | None = None
     """The amount of comments."""
-    attachments: collections.abc.Sequence[Attachment]
+    attachments: collections.abc.Sequence[Attachment] = []
     """The post attachments."""
-    tags: collections.abc.Sequence[Tag]
+    tags: collections.abc.Sequence[Tag] = []
     """The post tags."""
     author: User | None = None
     """The post author."""
-    connections: collections.abc.Sequence[Connection]
+    connections: collections.abc.Sequence[Connection] = []
     """The post connections."""
-    mentions: collections.abc.Sequence[Mention]
+    mentions: collections.abc.Sequence[Mention] = []
     """The post mentions."""
     nsfw: bool | None = None
     """Whether the post is NSFW."""
@@ -206,7 +210,7 @@ class Post(pydantic.BaseModel):
 class Page(pydantic.generics.GenericModel, typing.Generic[T]):
     """A page."""
 
-    items: collections.abc.Sequence[T]
+    items: collections.abc.Sequence[T] = []
     """The item list."""
     total: int | None = None
     """The total amount of items."""

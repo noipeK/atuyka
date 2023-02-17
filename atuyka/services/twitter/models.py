@@ -149,7 +149,6 @@ class TwitterMediaEntity(pydantic.BaseModel):
         # TODO: deduplicate code
         if self.type == "photo":
             filename = self.media_url_https.split("/")[-1]
-            content_type = "image/jpeg"
 
             attachment_urls: dict[str, base.AttachmentURL] = {}
             for size in ("thumb", "small", "medium", "large"):
@@ -160,7 +159,6 @@ class TwitterMediaEntity(pydantic.BaseModel):
                     width=self.sizes.__getattribute__(size).w,
                     height=self.sizes.__getattribute__(size).h,
                     filename=filename,
-                    content_type=content_type,
                     url=url,
                     alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
                 )
@@ -171,7 +169,6 @@ class TwitterMediaEntity(pydantic.BaseModel):
                 width=self.original_info.width,
                 height=self.original_info.height,
                 filename=filename,
-                content_type=content_type,
                 url=url,
                 alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
             )
@@ -312,7 +309,6 @@ class TwitterMedia(pydantic.BaseModel):
         """Convert to universal attachment."""
         if self.type == "photo":
             filename = self.media_url_https.split("/")[-1]
-            content_type = "image/jpeg"
 
             attachment_urls: dict[str, base.AttachmentURL] = {}
             for size in ("thumb", "small", "medium", "large"):
@@ -323,7 +319,6 @@ class TwitterMedia(pydantic.BaseModel):
                     width=self.sizes.__getattribute__(size).w,
                     height=self.sizes.__getattribute__(size).h,
                     filename=filename,
-                    content_type=content_type,
                     url=url,
                     alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:{size}",
                 )
@@ -334,7 +329,6 @@ class TwitterMedia(pydantic.BaseModel):
                 width=self.original_info.width,
                 height=self.original_info.height,
                 filename=filename,
-                content_type=content_type,
                 url=url,
                 alt_url=f"https://nitter.net/pic/orig/media%2F{filename}:orig",
             )
@@ -359,7 +353,8 @@ class TwitterMedia(pydantic.BaseModel):
                         filename=filename,
                         content_type=variant.content_type,
                         url=variant.url,
-                        alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{base.quote_url(variant.url)}",
+                        # nitter requires the hash which we don't have
+                        # alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{base.quote_url(variant.url)}",
                     )
                 else:
                     attachment_urls[size] = base.AttachmentURL(
@@ -378,7 +373,6 @@ class TwitterMedia(pydantic.BaseModel):
                 width=self.sizes.thumb.w,
                 height=self.sizes.thumb.h,
                 filename=self.media_url_https.split("/")[-1],
-                content_type="image/jpeg",
                 url=self.media_url_https,
                 alt_url=f"https://nitter.net/pic/{base.quote_url(self.media_url_https.split('com/', 1)[1])}",
             )
@@ -572,7 +566,6 @@ class TwitterUser(pydantic.BaseModel):
                 width=width,
                 height=width,
                 filename=url.split("/")[-1],
-                content_type="image/png",
                 url=url,
                 alt_url=f"https://nitter.net/pic/{base.quote_url(url, protocol=False)}",
             )
@@ -590,7 +583,6 @@ class TwitterUser(pydantic.BaseModel):
                     width=width,
                     height=height,
                     filename=url.split("/")[-2] + ".jpg",
-                    content_type="image/jpeg",
                     url=url,
                     alt_url=f"https://nitter.net/pic/{base.quote_url(url)}",
                 )

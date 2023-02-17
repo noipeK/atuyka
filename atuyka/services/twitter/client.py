@@ -224,7 +224,7 @@ class Twitter(base.ServiceClient):
     # ------------------------------------------------------------
     # UNIVERSAL:
 
-    async def get_user(self, user: str | None = ...) -> typing.NoReturn:
+    async def get_user(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get user."""
         raise NotImplementedError
 
@@ -234,6 +234,7 @@ class Twitter(base.ServiceClient):
         *,
         since_id: int | None = None,
         max_id: int | None = None,
+        **kwargs: object,
     ) -> base.models.Page[base.models.Post]:
         """Get liked posts."""
         tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id)
@@ -242,38 +243,38 @@ class Twitter(base.ServiceClient):
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
         return page
 
-    async def get_following(self, user: str | None = ...) -> typing.NoReturn:
+    async def get_following(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get following users."""
         raise NotImplementedError
 
-    async def get_followers(self, user: str | None = ...) -> typing.NoReturn:
+    async def get_followers(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get followers."""
         raise NotImplementedError
 
-    async def get_posts(self, user: str) -> typing.NoReturn:
+    async def get_posts(self, user: str, **kwargs: object) -> typing.NoReturn:
         """Get posts made by a user."""
         raise NotImplementedError
 
-    async def get_post(self, user: str, post: str) -> typing.NoReturn:
+    async def get_post(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
         """Get a post."""
         raise NotImplementedError
 
-    async def get_similar_posts(self, user: str, post: str) -> typing.NoReturn:
+    async def get_similar_posts(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
         """Get similar posts."""
         raise NotImplementedError
 
-    async def get_following_feed(self, user: str | None = ...) -> typing.NoReturn:
+    async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get posts made by followed users."""
         raise NotImplementedError
 
-    async def get_recommended_feed(self, user: str | None = ...) -> typing.NoReturn:
+    async def get_recommended_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get recommended posts."""
         raise NotImplementedError
 
-    async def search_posts(self, query: str | None = ...) -> typing.NoReturn:
+    async def search_posts(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search posts."""
         raise NotImplementedError
 
-    async def search_users(self, query: str | None = ...) -> typing.NoReturn:
+    async def search_users(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search users."""
         raise NotImplementedError
