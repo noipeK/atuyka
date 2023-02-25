@@ -2,16 +2,16 @@
 
 __all__ = [
     "AtuykaError",
-    "ServiceError",
-    "RateLimitedError",
+    "AuthenticationError",
+    "InvalidIDError",
     "InvalidResourceError",
     "InvalidServiceError",
-    "InvalidIDError",
-    "AuthenticationError",
-    "MissingTokenError",
     "InvalidTokenError",
-    "SuspendedResourceError",
+    "MissingTokenError",
     "PrivateResourceError",
+    "RateLimitedError",
+    "ServiceError",
+    "SuspendedResourceError",
 ]
 
 

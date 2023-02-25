@@ -32,7 +32,7 @@ class TwitterError(typing.TypedDict):
     message: str
 
 
-class Twitter(base.ServiceClient):
+class Twitter(base.ServiceClient, service="twitter"):
     """Twitter front-end API client."""
 
     auth_token: str | None

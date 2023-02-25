@@ -16,7 +16,7 @@ from . import models
 __all__ = ["Pixiv"]
 
 
-class Pixiv(base.ServiceClient):
+class Pixiv(base.ServiceClient, service="pixiv", auth=True):
     """Pixiv client."""
 
     token: str | None

@@ -65,7 +65,7 @@ def docs(session: nox.Session) -> None:
 def lint(session: nox.Session) -> None:
     """Run this project's modules against ruff."""
     install_requirements(session, "lint")
-    session.run("ruff", "check", *GENERAL_TARGETS, "--fix", *verbose_args())
+    session.run("python", "-m", "ruff", "check", *GENERAL_TARGETS, *verbose_args())
     session.run("python", "-m", "slotscheck", "-m", PACKAGE, *verbose_args())
 
 
@@ -73,7 +73,8 @@ def lint(session: nox.Session) -> None:
 def reformat(session: nox.Session) -> None:
     """Reformat this project's modules to fit the standard style."""
     install_requirements(session, "reformat")
-    session.run("black", *GENERAL_TARGETS, *verbose_args())
+    session.run("python", "-m", "black", *GENERAL_TARGETS, *verbose_args())
+    session.run("python", "-m", "ruff", "--fix-only", "--fixable", "ALL", *GENERAL_TARGETS, *verbose_args())
 
     session.log("sort-all")
     LOGGER.disabled = True

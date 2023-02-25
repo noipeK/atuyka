@@ -10,7 +10,7 @@ import starlette.responses
 import atuyka.errors
 import atuyka.services
 
-__all__ = ["router", "exception_handler"]
+__all__ = ["exception_handler", "router"]
 
 # /users/...
 # /users/.../likes
@@ -49,10 +49,8 @@ async def get_client(
     """
     token_header = request.headers.get("Authorization") or request.headers.get("x-service-token")
     token = token_header or token or request.cookies.get(f"{service}_token")
-    if not token:
-        raise atuyka.errors.MissingTokenError("No token provided.")
-
-    response.set_cookie(f"{service}_token", token)
+    if token:
+        response.set_cookie(f"{service}_token", token)
 
     client = atuyka.services.ServiceClient.create(service, token)
     await client.start()
@@ -61,6 +59,18 @@ async def get_client(
         yield client
     finally:
         await client.close()
+
+
+@router.get("/services")
+async def get_services() -> list[atuyka.services.models.AtuykaService]:
+    """Get available services."""
+    return [
+        atuyka.services.models.AtuykaService(
+            name=service.service_name or service.__name__,
+            authorization=service.requires_authorization,
+        )
+        for service in atuyka.services.ServiceClient.available_services.values()
+    ]
 
 
 @router.get("/users/{user}/likes")

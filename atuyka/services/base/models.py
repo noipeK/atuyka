@@ -29,6 +29,19 @@ def to_routed_url(service: str, url: str) -> str:
     return "/resources/" + service + "/" + quote_url(url)
 
 
+class AtuykaService(pydantic.BaseModel):
+    """An Atuyka service."""
+
+    name: str
+    """The service name."""
+    url: str | None = None
+    """The service URL."""
+    icon: str | None = None
+    """The service icon URL."""
+    authorization: bool
+    """Whether the service requires authorization."""
+
+
 class Connection(pydantic.BaseModel):
     """A connection to a different service."""
 

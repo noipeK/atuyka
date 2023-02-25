@@ -4,11 +4,8 @@ import starlette
 import starlette.requests
 import starlette.responses
 
-import atuyka.errors
-
-# activate all clients
-import atuyka.services.pixiv  # type: ignore # noqa: TODO: FIX
-import atuyka.services.twitter  # type: ignore  # noqa: TODO: FIX
+import atuyka
+import atuyka.services.pixiv
 
 from . import routes
 
@@ -17,6 +14,8 @@ __all__ = ["app"]
 app: fastapi.FastAPI = fastapi.FastAPI()
 app.include_router(routes.router)
 app.add_exception_handler(atuyka.errors.AtuykaError, routes.exception_handler)  # pyright: reportUnknownMemberType=false
+
+atuyka.load_services()
 
 
 @app.get("/", include_in_schema=False)
