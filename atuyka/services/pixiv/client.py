@@ -6,6 +6,7 @@ import urllib.parse
 import pixivpy_async as pixivpy
 import pydantic
 
+import atuyka.errors
 from atuyka.services import base
 
 from . import models
@@ -127,7 +128,7 @@ class Pixiv(base.ServiceClient):
     ) -> base.models.Page[base.models.Post]:
         """Get bookmarked illusts."""
         if isinstance(user, str) and not user.isdigit():
-            raise ValueError("Invalid user ID")
+            raise atuyka.errors.InvalidIDError("pixiv", user, "user")
 
         user_id = int(user) if user else self.user_id
         illusts = await self.get_user_bookmarks(user_id, max_bookmark_id=max_bookmark_id)

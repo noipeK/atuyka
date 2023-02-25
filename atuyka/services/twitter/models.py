@@ -182,7 +182,7 @@ class TwitterMediaEntity(pydantic.BaseModel):
                 original=attachment_urls["original"],
             )
 
-        warnings.warn(f"Unknown twitter media type: {self.type}")
+        warnings.warn(f"Unknown twitter media entity type: {self.type}")
         return base.Attachment(
             service="twitter",
             original=base.AttachmentURL(
@@ -223,7 +223,7 @@ class TwitterVideoInfo(pydantic.BaseModel):
 
     aspect_ratio: tuple[int, int]
     """Aspect ratio of the video."""
-    duration_millis: int
+    duration_millis: int | None
     """Duration of the video in milliseconds."""
     variants: collections.abc.Sequence[TwitterVideoVariant]
     """Variants of the video."""
@@ -361,7 +361,7 @@ class TwitterMedia(pydantic.BaseModel):
                         service="twitter",
                         width=self.sizes.__getattribute__(size).w,
                         height=self.sizes.__getattribute__(size).h,
-                        duration=self.video_info.duration_millis / 1000,
+                        duration=self.video_info.duration_millis and self.video_info.duration_millis / 1000,
                         filename=filename,
                         content_type=variant.content_type,
                         url=variant.url,
@@ -385,6 +385,37 @@ class TwitterMedia(pydantic.BaseModel):
                 large=attachment_urls["large"],
                 metadata=attachment_urls["metadata"],
                 original=attachment_urls["large"],
+            )
+
+        if self.type == "animated_gif":
+            assert self.video_info
+            attachment_urls: dict[str, base.AttachmentURL] = {}
+            variant = self.video_info.variants[0]
+
+            attachment_urls["thumbnail"] = base.AttachmentURL(
+                service="twitter",
+                width=self.sizes.thumb.w,
+                height=self.sizes.thumb.h,
+                filename=self.media_url_https.split("/")[-1],
+                url=self.media_url_https,
+                alt_url=f"https://nitter.net/pic/{base.quote_url(self.media_url_https.split('com/', 1)[1])}",
+            )
+
+            attachment_urls["original"] = base.AttachmentURL(
+                service="twitter",
+                width=self.sizes.large.w,
+                height=self.sizes.large.h,
+                filename=base.get_filename(variant.url),
+                content_type=variant.content_type,
+                loop=True,
+                url=variant.url,
+                alt_url=f"https://nitter.net/pic/{base.quote_url(self.media_url_https.split('com/', 1)[1])}",
+            )
+
+            return base.Attachment(
+                service="twitter",
+                thumbnail=attachment_urls["thumbnail"],
+                original=attachment_urls["original"],
             )
 
         warnings.warn(f"Unknown twitter media type: {self.type}")

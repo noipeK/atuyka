@@ -67,6 +67,8 @@ class AttachmentURL(pydantic.BaseModel):
     """The attachment filename."""
     content_type: str | None = None
     """The attachment content type."""
+    loop: bool = False
+    """Whether the video should loop like a GIF."""
 
     url: str
     """The original attachment URL."""

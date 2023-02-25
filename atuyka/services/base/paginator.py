@@ -108,7 +108,6 @@ class BufferedPaginator(typing.Generic[T], Paginator[T], abc.ABC):
         self._buffer = None
 
         super()._complete()
-        raise  # pyright bug
 
     @abc.abstractmethod
     async def next_page(self) -> collections.abc.Iterable[T] | None:
@@ -186,7 +185,6 @@ class MergedPaginator(typing.Generic[T], Paginator[T]):
         self.iterators = []
 
         super()._complete()
-        raise  # pyright bug
 
     def _create_heap_item(
         self,

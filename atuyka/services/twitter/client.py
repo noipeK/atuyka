@@ -6,6 +6,7 @@ import typing
 import aiohttp
 import pydantic
 
+import atuyka.errors
 from atuyka.services import base
 
 from . import models
@@ -22,6 +23,13 @@ GUEST_AUTHORIZATION = (
 UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 
 __all__ = ["Twitter"]
+
+
+class TwitterError(typing.TypedDict):
+    """Twitter error."""
+
+    code: int
+    message: str
 
 
 class Twitter(base.ServiceClient):
@@ -95,7 +103,7 @@ class Twitter(base.ServiceClient):
     async def get_authenticated_headers(self) -> collections.abc.Mapping[str, str]:
         """Return the authenticated headers for the request."""
         if not self.auth_token:
-            raise ValueError("No auth token provided.")
+            raise atuyka.errors.MissingTokenError("twitter")
 
         if not self.ct0:
             self.ct0 = await self._generate_ct0()
@@ -115,6 +123,20 @@ class Twitter(base.ServiceClient):
             return await self.get_authenticated_headers()
 
         return await self.get_guest_headers()
+
+    def _raise_errors(self, error: TwitterError, *errors: TwitterError, url: str) -> typing.NoReturn:
+        """Raise errors."""
+        code, message = error["code"], error["message"]
+        if code in (32,):
+            raise atuyka.errors.InvalidTokenError("twitter", self.auth_token or "")
+        if code in (34, 50):
+            raise atuyka.errors.InvalidResourceError("twitter", url)
+        if code in (63, 421, 422, 425):
+            raise atuyka.errors.SuspendedResourceError("twitter", url)
+        if code in (88,):
+            raise atuyka.errors.RateLimitedError("twitter")
+
+        raise atuyka.errors.ServiceError("twitter", message)
 
     async def request(
         self,
@@ -139,13 +161,18 @@ class Twitter(base.ServiceClient):
             headers=headers,
             **kwargs,
         ) as response:
-            response.raise_for_status()
-            data = await response.json(content_type=None)
+            try:
+                data = await response.json(content_type=None)
+            except aiohttp.ContentTypeError:
+                response.raise_for_status()
+                raise
 
         if "error" in data:
-            raise ValueError(data["error"])
-        if "errors" in data:
-            raise ValueError(data["errors"])
+            self._raise_errors(data["error"], url=str(response.url))
+        elif "errors" in data:
+            self._raise_errors(*data["errors"], url=str(response.url))
+        else:
+            response.raise_for_status()
 
         return data
 

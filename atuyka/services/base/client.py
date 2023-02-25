@@ -4,6 +4,8 @@ import typing
 
 import typing_extensions
 
+import atuyka.errors
+
 from . import models
 
 __all__ = ["ServiceClient"]
@@ -35,7 +37,7 @@ class ServiceClient(abc.ABC):
         # TODO: Use metaclasses to register subclasses.
         subclasses = {c.__name__.lower(): c for c in cls.__subclasses__()}
         if service not in subclasses:
-            raise ValueError(f"Service {service!r} not found: {', '.join(subclasses)!r}")
+            raise atuyka.errors.InvalidServiceError(service, list(subclasses))
 
         return subclasses[service](token)
 

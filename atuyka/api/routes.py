@@ -7,9 +7,10 @@ import fastapi.params
 import starlette.requests
 import starlette.responses
 
+import atuyka.errors
 import atuyka.services
 
-__all__ = ["router"]
+__all__ = ["router", "exception_handler"]
 
 # /users/...
 # /users/.../likes
@@ -49,7 +50,7 @@ async def get_client(
     token_header = request.headers.get("Authorization") or request.headers.get("x-service-token")
     token = token_header or token or request.cookies.get(f"{service}_token")
     if not token:
-        raise ValueError("No token provided.")  # TODO: custom exceptions
+        raise atuyka.errors.MissingTokenError("No token provided.")
 
     response.set_cookie(f"{service}_token", token)
 
@@ -58,8 +59,6 @@ async def get_client(
 
     try:
         yield client
-    except Exception:
-        raise  # TODO: handle exceptions
     finally:
         await client.close()
 
@@ -73,6 +72,43 @@ async def get_liked_posts(
     """Get liked posts."""
     user = _parse_user(user)
     return await client.get_liked_posts(user, **request.query_params)
+
+
+def exception_handler(
+    request: starlette.requests.Request,
+    exc: atuyka.errors.AtuykaError,
+) -> starlette.responses.JSONResponse:
+    """Handle atuyka exceptions."""
+    data = {}
+
+    error_type = type(exc).__name__.replace("Error", "")
+
+    match exc:
+        case atuyka.errors.InvalidServiceError(available_services=available_services):
+            status_code = 404
+            data = {"available_services": available_services}
+        case atuyka.errors.InvalidIDError(id=id):
+            status_code = 404
+            data = {"id": id}
+        case atuyka.errors.InvalidResourceError(resource=resource):
+            status_code = 404
+            data = {"resource": resource}
+        case atuyka.errors.PrivateResourceError(resource=resource):
+            status_code = 403
+            data = {"resource": resource}
+        case atuyka.errors.InvalidTokenError(token=token):
+            status_code = 401
+            data = {"token": token}
+        case atuyka.errors.AuthenticationError:
+            status_code = 401
+        case _:
+            status_code = 500
+            error_type = "Internal"
+
+    return starlette.responses.JSONResponse(
+        status_code=status_code,
+        content={"error": exc.message, "error_type": error_type, "service": exc.service, **data},
+    )
 
 
 def upgrade_response_model(router: fastapi.routing.APIRouter) -> None:
