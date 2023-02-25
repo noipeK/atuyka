@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import pathlib
 import typing
 
@@ -52,9 +51,9 @@ def docs(session: nox.Session) -> None:
             "docs",
             output,
             "--watch",
-            os.path.abspath(PACKAGE),
+            pathlib.Path(PACKAGE).resolve().as_posix(),
             "--ignore",
-            os.path.abspath("docs/reference"),
+            pathlib.Path("docs/reference").resolve().as_posix(),
             "--ignore",
             "*.tmp",
         )
@@ -64,10 +63,9 @@ def docs(session: nox.Session) -> None:
 
 @nox.session()
 def lint(session: nox.Session) -> None:
-    """Run this project's modules against the pre-defined flake8 linters."""
+    """Run this project's modules against ruff."""
     install_requirements(session, "lint")
-    session.run("pflake8", "--version")
-    session.run("pflake8", *GENERAL_TARGETS, *verbose_args())
+    session.run("ruff", "check", *GENERAL_TARGETS, "--fix", *verbose_args())
     session.run("python", "-m", "slotscheck", "-m", PACKAGE, *verbose_args())
 
 
@@ -76,7 +74,6 @@ def reformat(session: nox.Session) -> None:
     """Reformat this project's modules to fit the standard style."""
     install_requirements(session, "reformat")
     session.run("black", *GENERAL_TARGETS, *verbose_args())
-    session.run("isort", *GENERAL_TARGETS, *verbose_args())
 
     session.log("sort-all")
     LOGGER.disabled = True
@@ -120,7 +117,7 @@ def test(session: nox.Session) -> None:
     )
 
     if "--cov" in args:
-        session.log(f"HTML coverage report: {os.path.abspath('coverage_html/index.html')}")
+        session.log(f"HTML coverage report: {pathlib.Path('coverage_html/index.html').resolve()}")
 
 
 @nox.session(name="type-check")
@@ -139,15 +136,23 @@ def verify_types(session: nox.Session) -> None:
     session.run("pyright", "--verifytypes", PACKAGE, "--ignoreexternal", *verbose_args(), env=PYRIGHT_ENV)
 
 
+def _try_install_prettier(session: nox.Session) -> bool:
+    """Try to install prettier. Return False if failed."""
+    try:
+        session.run("npm", "install", "prettier", "prettier-plugin-toml", "--global", external=True)
+    except Exception as exception:  # noqa: BLE001: Nox throws a bare Exception
+        if str(exception) != "Program npm not found":
+            raise
+    else:
+        return True
+
+    return False
+
+
 @nox.session(python=False)
 def prettier(session: nox.Session) -> None:
     """Run prettier on markdown files."""
-    try:
-        session.run("prettier", "--version", silent=True, external=True)
-    except Exception as exception:
-        if str(exception) == "Program prettier not found":
-            session.skip()
+    if not _try_install_prettier(session):
+        session.skip("Prettier not installed")
 
-        raise
-
-    session.run("prettier", "-w", "*.md", "docs/*.md", "docs/**/*.md", "*.yml", external=True)
+    session.run("prettier", "-w", "*.md", "docs/*.md", "docs/**/*.md", "*.yml", "*.toml", external=True)

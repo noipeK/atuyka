@@ -207,7 +207,7 @@ class PixivIllust(pydantic.BaseModel):
 
     def to_universal(self) -> base.Post:
         """Convert the illust to a universal post."""
-        if self.meta_pages:
+        if self.meta_pages:  # noqa: SIM108  # ternary is weird here
             urls = [meta.image_urls for meta in self.meta_pages]
         else:
             urls = [self.image_urls]

@@ -49,7 +49,7 @@ async def get_client(
     token_header = request.headers.get("Authorization") or request.headers.get("x-service-token")
     token = token_header or token or request.cookies.get(f"{service}_token")
     if not token:
-        raise Exception("No token provided.")  # TODO: custom exceptions
+        raise ValueError("No token provided.")  # TODO: custom exceptions
 
     response.set_cookie(f"{service}_token", token)
 

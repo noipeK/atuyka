@@ -2,7 +2,7 @@
 from atuyka.services import twitter
 
 
-async def test_twitter_headers():
+async def test_twitter_headers() -> None:
     client = twitter.Twitter()
 
     headers = await client.get_headers()

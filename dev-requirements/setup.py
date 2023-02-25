@@ -1,17 +1,13 @@
 """Mock package to install the dev requirements."""
 import pathlib
-import typing
 
 import setuptools
 
 
-def parse_requirements_file(path: pathlib.Path) -> typing.List[str]:
+def parse_requirements_file(path: pathlib.Path) -> list[str]:
     """Parse a requirements file into a list of requirements."""
-    with open(path) as fp:
-        raw_dependencies = fp.readlines()
-
-    dependencies: typing.List[str] = []
-    for dependency in raw_dependencies:
+    dependencies: list[str] = []
+    for dependency in pathlib.Path(path).read_text().splitlines():
         comment_index = dependency.find("#")
         if comment_index == 0:
             continue
@@ -25,15 +21,15 @@ def parse_requirements_file(path: pathlib.Path) -> typing.List[str]:
     return dependencies
 
 
-def get_normal_requirements(directory: pathlib.Path) -> typing.List[str]:
+def get_normal_requirements(directory: pathlib.Path) -> list[str]:
     """Get all normal requirements in a dev requirements directory."""
     return parse_requirements_file(directory / ".." / "requirements.txt")
 
 
-def get_extras(directory: pathlib.Path) -> typing.Dict[str, typing.List[str]]:
+def get_extras(directory: pathlib.Path) -> dict[str, list[str]]:
     """Get all extras in a dev requirements directory."""
-    all_extras: typing.Set[str] = set()
-    extras: typing.Dict[str, typing.List[str]] = {}
+    all_extras: set[str] = set()
+    extras: dict[str, list[str]] = {}
 
     for path in directory.glob("*.txt"):
         name = path.name.split(".")[0]
@@ -51,6 +47,6 @@ def get_extras(directory: pathlib.Path) -> typing.Dict[str, typing.List[str]]:
 dev_directory = pathlib.Path(__file__).parent
 setuptools.setup(
     name="atuyka-dev",
-    install_requires=get_normal_requirements(dev_directory) + ["nox"],
+    install_requires=["nox", *get_normal_requirements(dev_directory)],
     extras_require=get_extras(dev_directory),
 )

@@ -13,14 +13,24 @@ pip install ./dev-requirements[all]
 
 ### VSCode
 
+Install the following extensions:
+
+- [Python](https://marketplace.visualstudio.com/items?itemName=ms-python.python)
+- [Pylance](https://marketplace.visualstudio.com/items?itemName=ms-python.vscode-pylance)
+- [Ruff](https://marketplace.visualstudio.com/items?itemName=charliermarsh.ruff)
+
 `.vscode/settings.json`
 
 ```json
 {
   "editor.formatOnSave": true,
-  "python.linting.flake8Enabled": true,
-  "python.linting.enabled": true,
-  "python.linting.flake8Path": ".nox/lint/bin/pflake8"
+  "python.defaultInterpreterPath": ".venv/bin/python",
+  "python.formatting.provider": "black",
+  "[python]": {
+    "editor.codeActionsOnSave": {
+      "source.fixAll": true
+    }
+  }
 }
 ```
 
@@ -42,6 +52,6 @@ If you have a slow connection use `nox --no-install` to skip installing dependen
 
 ## Style-guide
 
-Formatting is done by black and is checked by flake8. The project loosely follows [pep8](https://www.python.org/dev/peps/pep-0008/), but anything that is not covered by black or flake8 is up to the developer.
+Formatting is done by [black](https://github.com/psf/black) and is checked by [ruff](https://github.com/charliermarsh/ruff). The project loosely follows [pep8](https://www.python.org/dev/peps/pep-0008/), but anything that is not covered by black or ruff is up to the developer.
 
 Refer to [pyright's type-completness guidelines](https://github.com/microsoft/pyright/blob/main/docs/typed-libraries.md) and [standard typing library's type-completness guidelines](https://github.com/python/typing/blob/master/docs/libraries.md) to see how to properly type your code.

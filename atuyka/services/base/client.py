@@ -35,7 +35,7 @@ class ServiceClient(abc.ABC):
         # TODO: Use metaclasses to register subclasses.
         subclasses = {c.__name__.lower(): c for c in cls.__subclasses__()}
         if service not in subclasses:
-            raise Exception(f"Service {service!r} not found: {', '.join(subclasses)!r}")
+            raise ValueError(f"Service {service!r} not found: {', '.join(subclasses)!r}")
 
         return subclasses[service](token)
 

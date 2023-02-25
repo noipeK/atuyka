@@ -16,8 +16,8 @@ from . import models
 # This is not a private token
 GUEST_AUTHORIZATION = (
     "Bearer "
-    + "AAAAAAAAAAAAAAAAAAAAAF7aAAAAAAAASCiRjWvh7R5wxaKkFp7MM%2BhYBqM="
-    + "bQ0JPmjU9F6ZoMhDfI4uTNAaQuTDm2uO9x3WFVr2xBZ2nhjdP0"
+    "AAAAAAAAAAAAAAAAAAAAAF7aAAAAAAAASCiRjWvh7R5wxaKkFp7MM%2BhYBqM="
+    "bQ0JPmjU9F6ZoMhDfI4uTNAaQuTDm2uO9x3WFVr2xBZ2nhjdP0"
 )
 UA = "Mozilla/5.0 (Windows NT 6.2; Win64; x64; rv:16.0.1) Gecko/20121011 Firefox/16.0.1"
 
@@ -132,7 +132,13 @@ class Twitter(base.ServiceClient):
         if params:
             params = {k: v for k, v in params.items() if v is not None}
 
-        async with aiohttp.request(method, url, params=params, headers=headers, **kwargs) as response:  # type: ignore
+        async with aiohttp.request(
+            method,
+            url,
+            params=params,  # pyright: ignore  # untyped
+            headers=headers,
+            **kwargs,
+        ) as response:
             response.raise_for_status()
             data = await response.json(content_type=None)
 
@@ -204,10 +210,7 @@ class Twitter(base.ServiceClient):
     async def get_user_info(self, user: int | str) -> models.TwitterUser:
         """Get the info of a user."""
         url = "https://api.twitter.com/1.1/users/show.json"
-        if isinstance(user, int):
-            params = dict(user_id=user)
-        else:
-            params = dict(screen_name=user)
+        params = dict(user_id=user) if isinstance(user, int) else dict(screen_name=user)
 
         data = await self.request(url, params=params)
         return pydantic.parse_obj_as(models.TwitterUser, data)

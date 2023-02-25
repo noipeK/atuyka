@@ -5,9 +5,6 @@ build-backend = "setuptools.build_meta"
 [tool.black]
 line-length = 120
 
-[tool.isort]
-profile = "black"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
@@ -15,11 +12,10 @@ testpaths = ["tests"]
 [tool.pyright]
 include = ["atuyka"]
 exclude = ["**/__init__.py", "tests/**"]
-
 typeCheckingMode = "strict"
 reportMissingTypeStubs = "none"
 reportImportCycles = "none"
-reportUnusedFunction = "none"  # Makes usage of validators impossible
+reportUnusedFunction = "none" # Makes usage of validators impossible
 reportPrivateUsage = "none"
 
 [tool.coverage.run]
@@ -31,39 +27,66 @@ show_missing = true
 skip_covered = false
 sort = "cover"
 
-[tool.flake8]
-exclude = ["tests", "test.py"]
-# D105: Missing docstring in magic method
-# S101: Use of assert
-# S110: Try, Except, Pass
-# W503: anti-pattern Line break before binary operator
+[tool.ruff]
+select = ["ALL"]
+# 120 from black and then a bit
+line-length = 130
+# A: Shadowing built-in
+# ARG: Unused function argument (duck-typing)
+# EM: String literal in exception
+# FBT: Boolean in positional function type (duck-typing)
+# TCH: Not using TYPE_CHECKING (ugly)
+# ANN10: Missing type annotation for self/cls (useless)
+# ANN401: Use of typing.Any (complicates)
+# B008: Do not perform function calls in argument defaults (pydantic)
+# B027: Empty method in ABC (optional rewrite)
+# B905: zip without strict= (ugly)
+# C408: Unnecessary dict call (ugly)
+# D105: Missing docstring in magic method (useless)
+# N805: First argument is not self (pydantic)
+# PLR0913: Too many arguments
+# PLR2004: constant value in comparison (asserts)
+# PLW2901: Redefining for-loop variable
+# RET504: Unnecessary variable before return (ugly)
+# TRY003: Long exception message
+# S101: Use of assert (type-checking)
+# S110: Try, Except, Pass (annoying)
 ignore = [
-    "D105",  
-    "S101",  
-    "S110",  
-    "W503",  
+  "A",
+  "ARG",
+  "EM",
+  "FBT",
+  "TCH",
+  "ANN10",
+  "ANN401",
+  "B008",
+  "B027",
+  "B905",
+  "C408",
+  "D105",
+  "N805",
+  "PLR0913",
+  "PLR2004",
+  "PLW2901",
+  "RET504",
+  "S101",
+  "TRY003",
+  "S110",
 ]
-# D40*: docstring formatting
-# F401: unused import
-# F403: cannot detect unused vars if we use starred import
-# D10*: docstrings
-# S10*: hardcoded passwords
-# F841: unused variable
-# I900: dev dependency
-per-file-ignores = [
-    "**/__init__.py: D40, F401, F403",
-    "tests/**: D10, S10, F841, I900",
-    "noxfile.py: I900",
-    "docs/**: I900",
-    "dev-requirements/**: I900",
-]
+
+[tool.ruff.per-file-ignores]
+# F40: import (unused imports)
+"**/__init__.py" = ["F40"]
+# D10: missing docstring (tests)
+# F841: unused variable (return values)
+# S10: hardcoded passwords (dummy values)
+"tests/**" = ["D10", "S10", "F841"]
+# INP001: No __init__.py (configuration)
+"docs/conf.py" = ["INP001"]
+"dev-requirements/setup.py" = ["INP001"]
+
+[tool.ruff.mccabe]
 max-complexity = 15
-max-function-length = 100
-max-line-length = 160
 
-max_annotations_complexity = 5
-
-accept-encodings = "utf-8"
-docstring-convention = "numpy"
-ignore-decorators = "property"
-requirements_file = "requirements.txt"
+[tool.ruff.pydocstyle]
+convention = "numpy"

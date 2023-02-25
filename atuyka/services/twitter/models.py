@@ -120,9 +120,9 @@ class TwitterMediaEntity(pydantic.BaseModel):
     """Media in the tweet."""
 
     id: int
-    """Media ID.""" ""
+    """Media ID."""
     id_str: int
-    """Media ID as a string.""" ""
+    """Media ID as a string."""
     indices: tuple[int, int]
     """Position of the media in the entity."""
     media_url: str
@@ -181,15 +181,15 @@ class TwitterMediaEntity(pydantic.BaseModel):
                 large=attachment_urls["large"],
                 original=attachment_urls["original"],
             )
-        else:
-            warnings.warn(f"Unknown twitter media type: {self.type}")
-            return base.Attachment(
+
+        warnings.warn(f"Unknown twitter media type: {self.type}")
+        return base.Attachment(
+            service="twitter",
+            original=base.AttachmentURL(
                 service="twitter",
-                original=base.AttachmentURL(
-                    service="twitter",
-                    url=self.media_url_https,
-                ),
-            )
+                url=self.media_url_https,
+            ),
+        )
 
 
 class TweetEntities(pydantic.BaseModel):
@@ -275,9 +275,9 @@ class TwitterMedia(pydantic.BaseModel):
     """Media in a tweet."""
 
     id: int
-    """Media ID.""" ""
+    """Media ID."""
     id_str: int
-    """Media ID as a string.""" ""
+    """Media ID as a string."""
     indices: tuple[int, int]
     """Position of the media in the entity."""
     media_url: str
@@ -341,7 +341,8 @@ class TwitterMedia(pydantic.BaseModel):
                 large=attachment_urls["large"],
                 original=attachment_urls["original"],
             )
-        elif self.type == "video":
+
+        if self.type == "video":
             assert self.video_info
             attachment_urls: dict[str, base.AttachmentURL] = {}
             variants = sorted(self.video_info.variants, key=lambda v: v.bitrate or 0)
@@ -354,7 +355,6 @@ class TwitterMedia(pydantic.BaseModel):
                         content_type=variant.content_type,
                         url=variant.url,
                         # nitter requires the hash which we don't have
-                        # alt_url=f"https://nitter.net/video/{filename.split('.')[0].upper()}/{base.quote_url(variant.url)}",
                     )
                 else:
                     attachment_urls[size] = base.AttachmentURL(
@@ -386,15 +386,15 @@ class TwitterMedia(pydantic.BaseModel):
                 metadata=attachment_urls["metadata"],
                 original=attachment_urls["large"],
             )
-        else:
-            warnings.warn(f"Unknown twitter media type: {self.type}")
-            return base.Attachment(
+
+        warnings.warn(f"Unknown twitter media type: {self.type}")
+        return base.Attachment(
+            service="twitter",
+            original=base.AttachmentURL(
                 service="twitter",
-                original=base.AttachmentURL(
-                    service="twitter",
-                    url=self.media_url_https,
-                ),
-            )
+                url=self.media_url_https,
+            ),
+        )
 
 
 class TweetExtendedEntities(pydantic.BaseModel):
@@ -784,7 +784,7 @@ class TimelineObjects(pydantic.BaseModel):
 class Timeline(pydantic.BaseModel):
     """A timeline summary."""
 
-    globalObjects: TimelineObjects
+    globalObjects: TimelineObjects  # noqa: N815
     """Timeline objects."""
     timeline: object
     """Timeline order."""
