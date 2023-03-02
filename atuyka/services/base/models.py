@@ -229,5 +229,7 @@ class Page(pydantic.generics.GenericModel, typing.Generic[T]):
     """The item list."""
     total: int | None = None
     """The total amount of items."""
+    remaining: int | None = None
+    """The remaining amount of items."""
     next: collections.abc.Mapping[str, int | str] | None = None
     """The parameters for the next page."""

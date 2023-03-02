@@ -1,12 +1,17 @@
 """Twitter API models."""
+from __future__ import annotations
+
 import collections.abc
 import datetime
 import re
+import typing
 import warnings
 
 import pydantic
 
 from atuyka.services.base import models as base
+
+T = typing.TypeVar("T")
 
 
 class TweetHashtag(pydantic.BaseModel):
@@ -513,6 +518,8 @@ class TwitterUser(pydantic.BaseModel):
     """The number of media the user has posted."""
     lang: object | None
     """IDK."""
+    status: Tweet | None
+    """The pinned tweet."""
     contributors_enabled: bool
     """IDK."""
     is_translator: bool
@@ -581,8 +588,7 @@ class TwitterUser(pydantic.BaseModel):
     def to_universal(self) -> base.User:
         """Convert the Twitter user to a universal user."""
         urls = {url.url: url.expanded_url for url in self.entities.description.urls}
-        bio = self.description.rsplit(" ", 1)[0]
-        bio = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), bio)
+        bio = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), self.description)
 
         avatar_urls: dict[str, base.AttachmentURL] = {}
         for size, name, width in [
@@ -707,10 +713,10 @@ class Tweet(pydantic.BaseModel):
     """Number of retweets."""
     favorite_count: int
     """Number of likes."""
-    conversation_id: int
-    """Special ID for the conversation."""
-    conversation_id_str: int
-    """Special ID for the conversation as a string."""
+    conversation_id: int | None
+    """Special ID for the conversation. None if a status."""
+    conversation_id_str: int | None
+    """Special ID for the conversation as a string. None if a status."""
     favorited: bool
     """Whether the tweet is liked by the authenticated user."""
     retweeted: bool
@@ -729,8 +735,7 @@ class Tweet(pydantic.BaseModel):
         assert self.user
 
         urls = {url.url: url.expanded_url for url in self.entities.urls}
-        text = self.full_text.rsplit(" ", 1)[0]
-        text = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), text)
+        text = re.sub(r"https://t.co/\w+", lambda m: urls.get(m[0], m[0]), self.full_text)
 
         found_urls: list[str] = []
         attachments: list[base.Attachment] = []
@@ -790,7 +795,15 @@ class Cursor(pydantic.BaseModel):
     previous_cursor_str: str
     """The previous cursor as a string."""
     total_count: int | None
-    """The total number of items in the cursor."""
+    """The total number of items left in the cursor."""
+
+    def _to_universal(self, items: collections.abc.Sequence[T]) -> base.Page[T]:
+        """Convert the cursor to a universal cursor."""
+        return base.Page(
+            items=items,
+            remaining=self.total_count,
+            next={"cursor": self.next_cursor} if self.next_cursor else None,
+        )
 
 
 class UserCursor(Cursor):
@@ -798,6 +811,10 @@ class UserCursor(Cursor):
 
     users: collections.abc.Sequence[TwitterUser]
     """The users in the cursor."""
+
+    def to_universal(self) -> base.Page[base.User]:
+        """Convert the cursor to a universal cursor."""
+        return self._to_universal([user.to_universal() for user in self.users])
 
 
 # ====================
@@ -819,3 +836,6 @@ class Timeline(pydantic.BaseModel):
     """Timeline objects."""
     timeline: object
     """Timeline order."""
+
+
+TwitterUser.update_forward_refs()

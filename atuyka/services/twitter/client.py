@@ -176,10 +176,36 @@ class Twitter(base.ServiceClient, service="twitter"):
 
         return data
 
+    async def request_json_api(
+        self,
+        endpoint: str,
+        *,
+        version: str = "1.1",
+        params: typing.Mapping[str, str | int | None] | None = None,
+        data: typing.Mapping[str, object] | None = None,
+        **kwargs: typing.Any,
+    ) -> typing.Any:
+        """Make a request to the Twitter v1 API."""
+        url = f"https://api.twitter.com/{version}/{endpoint}"
+
+        if version == "1.1":
+            params = dict(params or {})
+            params.update(
+                include_user_entities="true",
+                tweet_mode="extended",
+            )
+
+        return await self.request(
+            url,
+            params=params,
+            json=data,
+            method=kwargs.get("header") or ("POST" if data else "GET"),
+            **kwargs,
+        )
+
     async def _get_account_settings(self) -> dict[str, typing.Any]:
         """Get the settings."""
-        url = "https://api.twitter.com/1.1/account/settings.json"
-        return await self.request(url)
+        return await self.request_json_api("account/settings.json")
 
     async def _get_my_screen_name(self) -> str:
         """Get the authenticated user screen name."""
@@ -190,73 +216,108 @@ class Twitter(base.ServiceClient, service="twitter"):
         self.my_screen_name = settings["screen_name"]
         return self.my_screen_name
 
+    async def _parse_user(self, user: int | str | None) -> collections.abc.Mapping[str, typing.Any]:
+        """Parse a user into a params dict."""
+        if user is None:
+            user = await self._get_my_screen_name()
+
+        if isinstance(user, int) or user.isdigit():
+            return {"user_id": user}
+
+        return {"screen_name": user}
+
+    # ------------------------------------------------------------
+    # RAW API:
+
     async def get_favorites(
         self,
-        screen_name: str | None = None,
+        user: str | int | None = None,
         *,
         count: int | None = None,
         since_id: int | None = None,
         max_id: int | None = None,
     ) -> collections.abc.Sequence[models.Tweet]:
         """Get the favorites of a user."""
-        url = "https://api.twitter.com/1.1/favorites/list.json"
         params = dict(
-            screen_name=screen_name or await self._get_my_screen_name(),
+            **(await self._parse_user(user)),
             count=count,
             since_id=since_id,
             max_id=max_id,
-            include_entities="true",
-            tweet_mode="extended",
         )
-        data = await self.request(url, params=params)
+        data = await self.request_json_api("favorites/list.json", params=params)
         return pydantic.parse_obj_as(collections.abc.Sequence[models.Tweet], data)
 
     async def get_friends(
         self,
-        screen_name: str | None = None,
+        user: str | int | None = None,
         *,
         cursor: int | None = None,
         count: int | None = None,
-        skip_status: bool | None = None,
-        include_user_entities: bool | None = None,
-        tweet_mode: str | None = None,
     ) -> models.UserCursor:
         """Get the friends of a user."""
-        url = "https://api.twitter.com/1.1/friends/list.json"
         params = dict(
-            screen_name=screen_name or await self._get_my_screen_name(),
+            **(await self._parse_user(user)),
             cursor=cursor,
             count=count,
-            skip_status=skip_status,
-            include_user_entities=include_user_entities,
-            tweet_mode=tweet_mode,
         )
-        data = await self.request(url, params=params)
+        data = await self.request_json_api("friends/list.json", params=params)
         return pydantic.parse_obj_as(models.UserCursor, data)
 
-    async def get_user_info(self, user: int | str) -> models.TwitterUser:
-        """Get the info of a user."""
-        url = "https://api.twitter.com/1.1/users/show.json"
-        params = dict(user_id=user) if isinstance(user, int) else dict(screen_name=user)
+    async def get_follows(
+        self,
+        user: str | int | None = None,
+        *,
+        cursor: int | None = None,
+        count: int | None = None,
+    ) -> models.UserCursor:
+        """Get the follows of a user."""
+        params = dict(
+            **(await self._parse_user(user)),
+            cursor=cursor,
+            count=count,
+        )
+        data = await self.request_json_api("followers/list.json", params=params)
+        return pydantic.parse_obj_as(models.UserCursor, data)
 
-        data = await self.request(url, params=params)
+    async def get_user_info(self, user: int | str | None = None) -> models.TwitterUser:
+        """Get the info of a user."""
+        params = await self._parse_user(user)
+
+        data = await self.request_json_api("users/show.json", params=params)
         return pydantic.parse_obj_as(models.TwitterUser, data)
 
-    async def get_user_tweets(self, user: int | str) -> models.Timeline:
+    async def get_user_tweets(
+        self,
+        user: int | str | None = None,
+        *,
+        count: int | None = None,
+        since_id: int | None = None,
+        max_id: int | None = None,
+    ) -> collections.abc.Sequence[models.Tweet]:
         """Get the tweets of a user."""
-        if isinstance(user, str):
-            user = (await self.get_user_info(user)).id
+        params = dict(
+            **(await self._parse_user(user)),
+            count=count,
+            since_id=since_id,
+            max_id=max_id,
+        )
 
-        url = f"https://api.twitter.com/2/timeline/profile/{user}.json"
-        data = await self.request(url)
-        return pydantic.parse_obj_as(models.Timeline, data)
+        data = await self.request_json_api("statuses/user_timeline.json", params=params)
+        return pydantic.parse_obj_as(collections.abc.Sequence[models.Tweet], data)
+
+    async def get_tweet(self, tweet_id: int) -> models.Tweet:
+        """Get a tweet."""
+        params = dict(id=tweet_id)
+        data = await self.request_json_api("statuses/show.json", params=params)
+        return pydantic.parse_obj_as(models.Tweet, data)
 
     # ------------------------------------------------------------
     # UNIVERSAL:
 
-    async def get_user(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_user(self, user: str | None = None, **kwargs: object) -> base.models.User:
         """Get user."""
-        raise NotImplementedError
+        data = await self.get_user_info(user)
+        return data.to_universal()
 
     async def get_liked_posts(
         self,
@@ -273,21 +334,49 @@ class Twitter(base.ServiceClient, service="twitter"):
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
         return page
 
-    async def get_following(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_following(
+        self,
+        user: str | None = None,
+        *,
+        cursor: int | None = None,
+        count: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.User]:
         """Get following users."""
-        raise NotImplementedError
+        users = await self.get_friends(user, cursor=cursor, count=count)
+        return users.to_universal()
 
-    async def get_followers(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_followers(
+        self,
+        user: str | None = None,
+        *,
+        cursor: int | None = None,
+        count: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.User]:
         """Get followers."""
-        raise NotImplementedError
+        users = await self.get_follows(user, cursor=cursor, count=count)
+        return users.to_universal()
 
-    async def get_posts(self, user: str, **kwargs: object) -> typing.NoReturn:
+    async def get_posts(
+        self,
+        user: str,
+        *,
+        since_id: int | None = None,
+        max_id: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.Post]:
         """Get posts made by a user."""
-        raise NotImplementedError
+        tweets = await self.get_user_tweets(user, since_id=since_id, max_id=max_id)
+        posts = [tweet.to_universal() for tweet in tweets]
 
-    async def get_post(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
+        page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
+        return page
+
+    async def get_post(self, user: str, post: str, **kwargs: object) -> base.models.Post:
         """Get a post."""
-        raise NotImplementedError
+        tweet = await self.get_tweet(int(post))
+        return tweet.to_universal()
 
     async def get_similar_posts(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
         """Get similar posts."""

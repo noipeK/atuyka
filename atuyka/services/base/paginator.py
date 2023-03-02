@@ -2,14 +2,24 @@
 import abc
 import asyncio
 import collections.abc
+import functools
 import heapq
 import random
 import typing
 
 import typing_extensions
 
-__all__ = ["BufferedPaginator", "MergedPaginator", "Paginator"]
+from . import models
 
+__all__ = [
+    "BufferedPaginator",
+    "MergedPaginator",
+    "Paginator",
+    "UniversalPaginator",
+    "paginate",
+]
+
+P = typing_extensions.ParamSpec("P")
 T = typing.TypeVar("T")
 
 
@@ -250,3 +260,39 @@ class MergedPaginator(typing.Generic[T], Paginator[T]):
         lists = await asyncio.gather(*coros)
 
         return list(heapq.merge(*lists, key=self._key))[: self.limit]
+
+
+class UniversalPaginator(typing.Generic[T], BufferedPaginator[T]):
+    """Paginator for atuyka's universal pages."""
+
+    endpoint: typing.Callable[..., typing.Awaitable[models.Page[T]]]
+    _next_params: collections.abc.Mapping[str, typing.Any] | None
+
+    def __init__(
+        self,
+        endpoint: typing.Callable[..., typing.Awaitable[models.Page[T]]],
+        *,
+        limit: int | None = None,
+    ) -> None:
+        super().__init__(limit=limit)
+        self.endpoint = endpoint
+        self._next_params = {}
+
+    async def next_page(self) -> collections.abc.Iterable[T] | None:
+        """Get the next page of the paginator."""
+        if self._next_params is None:
+            return None
+
+        page = await self.endpoint(**self._next_params)
+        self._next_params = page.next
+        return page.items
+
+
+def paginate(callback: typing.Callable[P, typing.Awaitable[models.Page[T]]]) -> typing.Callable[P, Paginator[T]]:
+    """Create a paginator from an endpoint."""
+
+    @functools.wraps(callback)
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Paginator[T]:
+        return UniversalPaginator(functools.partial(callback, *args, **kwargs))
+
+    return wrapper
