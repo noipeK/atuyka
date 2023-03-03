@@ -32,7 +32,7 @@ class TwitterError(typing.TypedDict):
     message: str
 
 
-class Twitter(base.ServiceClient, service="twitter"):
+class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
     """Twitter front-end API client."""
 
     auth_token: str | None
@@ -325,10 +325,11 @@ class Twitter(base.ServiceClient, service="twitter"):
         *,
         since_id: int | None = None,
         max_id: int | None = None,
+        count: int | None = None,
         **kwargs: object,
     ) -> base.models.Page[base.models.Post]:
         """Get liked posts."""
-        tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id)
+        tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
@@ -364,10 +365,11 @@ class Twitter(base.ServiceClient, service="twitter"):
         *,
         since_id: int | None = None,
         max_id: int | None = None,
+        count: int | None = None,
         **kwargs: object,
     ) -> base.models.Page[base.models.Post]:
         """Get posts made by a user."""
-        tweets = await self.get_user_tweets(user, since_id=since_id, max_id=max_id)
+        tweets = await self.get_user_tweets(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
         page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))

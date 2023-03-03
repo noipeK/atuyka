@@ -3,10 +3,12 @@ import collections.abc
 import datetime
 import re
 import typing
+import urllib.parse
 
 import pydantic
 import pydantic.generics
 
+from atuyka.services.base import client as base_client
 from atuyka.services.base import models as base
 
 T = typing.TypeVar("T")
@@ -33,7 +35,7 @@ class PixivImageURLs(pydantic.BaseModel):
 
         # https://i.pximg.net/img-original/img/2017/04/05/00/00/02/62258773_p0.png
         # img/2017/04/05/00/00/02/62258773_p0
-        match = re.search(r"img(?:/\d+){6}/\d+_p(\d+)", self.medium)
+        match = re.search(r"img(?:/\d+){6}/\d+(?:_p(\d+))?", self.medium)
         assert match, self.medium
         substring = match[0]
 
@@ -74,15 +76,20 @@ class PixivProfileImageURLs(pydantic.BaseModel):
         """Convert to a universal attachment URL."""
         return base.Attachment(
             service="pixiv",
-            original=base.AttachmentURL(
-                service="pixiv",
-                url=self.medium,
-                alt_url=_to_alt_image(self.medium),
-            ),
             small=base.AttachmentURL(
                 service="pixiv",
                 url=self.medium.replace("_170", "_50"),
                 alt_url=_to_alt_image(self.medium.replace("_170", "_50")),
+            ),
+            medium=base.AttachmentURL(
+                service="pixiv",
+                url=self.medium,
+                alt_url=_to_alt_image(self.medium),
+            ),
+            original=base.AttachmentURL(
+                service="pixiv",
+                url=self.medium.replace("_170", ""),
+                alt_url=_to_alt_image(self.medium.replace("_170", "")),
             ),
         )
 
@@ -101,7 +108,7 @@ class PixivIllustMeta(pydantic.BaseModel):
     """The illustration thumbnail URLs."""
 
 
-class PixivIllustAuthor(pydantic.BaseModel):
+class PixivUser(pydantic.BaseModel):
     """A pixiv illust author."""
 
     id: int
@@ -112,8 +119,12 @@ class PixivIllustAuthor(pydantic.BaseModel):
     """The user account name."""
     profile_image_urls: PixivProfileImageURLs
     """The user profile image URLs."""
+    comment: str | None
+    """The user bio. Only in user details."""
     is_followed: bool
     """Whether the user is being followed by the authenticated user."""
+    is_access_blocking_user: bool | None
+    """Whether the authenticated user blocked this user. Only in user details."""
 
     def to_universal(self) -> base.User:
         """Convert to a universal user."""
@@ -127,8 +138,6 @@ class PixivIllustAuthor(pydantic.BaseModel):
             alt_url=f"https://www.pixiv.moe/user/{self.id}",
             avatar=self.profile_image_urls.to_universal(),
             connections=[],  # TODO: Detect connections from mentions
-            mentions=[],  # no bio
-            tags=[],  # no bio
             following=self.is_followed,
         )
 
@@ -166,7 +175,7 @@ class PixivIllust(pydantic.BaseModel):
     """The illustration caption in html."""
     restrict: bool
     """IDK."""
-    user: PixivIllustAuthor
+    user: PixivUser
     """The illustration author."""
     tags: collections.abc.Sequence[PixivTag]
     """The illustration tags."""
@@ -226,16 +235,229 @@ class PixivIllust(pydantic.BaseModel):
             tags=[base.Tag(service="pixiv", name=tag.name, localized_name=tag.translated_name) for tag in self.tags],
             author=self.user.to_universal(),
             connections=[],  # TODO: Detect connections from mentions
+            # TODO: Contained in <a href=""> tags, consider parsing the html
             mentions=[base.Mention(url=url) for url in re.findall(r"https?://[^\s]+", self.title + " " + self.caption)],
             nsfw=self.sanity_level > 4,  # TODO: Figure this out precisely
             liked=self.is_bookmarked,
         )
 
 
-class PixivPaginatedResource(pydantic.generics.GenericModel, typing.Generic[T]):
+class PixivProfile(pydantic.BaseModel):
+    """A pixiv user profile."""
+
+    webpage: str | None
+    """URL to the user's website."""
+    gender: str
+    """The user's gender."""
+    birth: str
+    """The user's birth date."""
+    region: str
+    """The user's region."""
+    job: str
+    """The user's job."""
+    total_follow_users: int
+    """The total number of users following the user."""
+    total_mypixiv_users: int
+    """IDK."""
+    total_illusts: int
+    """The total number of illustrations the user has posted."""
+    total_manga: int
+    """The total number of manga the user has posted."""
+    total_novels: int
+    """The total number of novels the user has posted."""
+    total_illust_bookmarks_public: int
+    """The total number of public bookmarks the user has received."""
+    background_image_url: str | None
+    """The user's background image URL."""
+    twitter_account: str | None
+    """The user's twitter account."""
+    twitter_url: str | None
+    """The user's twitter URL."""
+    is_premium: bool
+    """Whether the user is a premium user."""
+
+    def background_image_to_universal(self) -> base.Attachment | None:
+        """Convert the background image to a universal image."""
+        if self.background_image_url is None:
+            return None
+
+        # https://i.pximg.net/c/1200x600_90_a2_g5/background/img/2020/09/14/15/32/52/24234_1f609991b032620ead844f487e88fe7b_master1200.jpg
+        # https://i.pximg.net/c/1920x960_80_a2_g5/background/img/2020/09/14/15/32/52/24234_1f609991b032620ead844f487e88fe7b.jpg
+        original_url = self.background_image_url.replace("_master1200", "")
+        original_url = original_url.replace("1200x600_90_a2_g5", "1920x960_80_a2_g5")
+
+        urls: dict[str, base.AttachmentURL] = {}
+        for size, url, (width, height) in [
+            ("large", self.background_image_url, (1200, 600)),
+            ("original", original_url, (1920, 960)),
+        ]:
+            urls[size] = base.AttachmentURL(
+                service="pixiv",
+                width=width,
+                height=height,
+                url=url,
+                alt_url=_to_alt_image(url),
+            )
+
+        return base.Attachment(
+            service="pixiv",
+            large=urls["large"],
+            original=urls["original"],
+        )
+
+
+class PixivUserDetails(pydantic.BaseModel):
+    """A pixiv user."""
+
+    user: PixivUser
+    """Partial user details."""
+    profile: PixivProfile
+    """Profile details."""
+    workspace: collections.abc.Mapping[str, str | None]
+    """IDK. Useless."""
+
+    def to_universal(self) -> base.User:
+        """Convert the user to a universal user."""
+        connections: list[base.Connection] = []
+        mentions: list[base.Mention] = []
+
+        if self.profile.twitter_url:
+            connections.append(
+                base.Connection(
+                    service="twitter",
+                    url=self.profile.twitter_url,
+                    user_id=self.profile.twitter_account,
+                ),
+            )
+            mentions.append(base.Mention(url=self.profile.twitter_url))
+
+        if self.profile.webpage:
+            mentions.append(base.Mention(url=self.profile.webpage))
+        if self.user.comment:
+            for url in re.findall(r"https?://[^\s]+", self.user.comment):
+                mentions.append(base.Mention(url=url))
+
+        # TODO: Parse automatically
+        for mention in mentions:
+            if any(part in mention.url for part in ("pixiv.net", "twitter.com")):
+                continue
+
+            for service in base_client.ServiceClient.available_services.values():
+                if not service.url:
+                    continue
+
+                if service.url in mention.url:
+                    connection = base.Connection(service=service.service_name, url=mention.url)
+                    connections.append(connection)
+                    break
+
+        return base.User(
+            service="pixiv",
+            id=str(self.user.id),
+            name=self.user.name,
+            unique_name=self.user.account,
+            bio=self.user.comment,
+            url=f"https://www.pixiv.net/users/{self.user.id}",
+            alt_url=f"https://www.pixiv.moe/user/{self.user.id}",
+            avatar=self.user.profile_image_urls.to_universal(),
+            banner=self.profile.background_image_to_universal(),
+            # actually following? The heck pixiv!?
+            # followers=self.profile.total_follow_users,
+            connections=connections,
+            mentions=mentions,
+            following=self.user.is_followed,
+        )
+
+
+class PixivUserPreview(pydantic.BaseModel):
+    """A pixiv user with a few illusts and novels."""
+
+    # illusts and novels are not parsed for optimizations
+    # 30x3 = 90 full illust objects per request are too much
+
+    user: PixivUser
+    """Partial user details."""
+    illusts: collections.abc.Sequence[object]
+    """The user's illustrations."""
+    novels: collections.abc.Sequence[object]
+    """The user's novels."""
+    is_muted: bool
+    """Whether the user is muted."""
+
+    def to_universal(self) -> base.User:
+        """Convert the user to a universal user."""
+        return self.user.to_universal()
+
+
+class PixivPaginatedResource(pydantic.BaseModel):
     """Pixiv paginated resource."""
 
-    illusts: collections.abc.Sequence[T]
+    next_url: str | None
+    """The next page URL."""
+
+    def get_next_query(self, key: str = "offset") -> collections.abc.Mapping[str, str] | None:
+        """Convert the resource to a universal paginated resource."""
+        if self.next_url is None:
+            return None
+
+        parsed = urllib.parse.urlparse(self.next_url)
+        query = dict(urllib.parse.parse_qsl(parsed.query))
+        return {key: query[key]}
+
+
+class PixivPaginatedIllusts(PixivPaginatedResource):
+    """Pixiv paginated illustrations."""
+
+    illusts: collections.abc.Sequence[PixivIllust]
+    """The illustrations."""
+
+    def to_universal(self) -> base.Page[base.Post]:
+        """Convert the resource to a universal paginated resource."""
+        return base.Page(
+            items=[illust.to_universal() for illust in self.illusts],
+            next=self.get_next_query(),
+        )
+
+
+class PixivPaginatedBookmarks(PixivPaginatedResource):
+    """Pixiv paginated bookmarks."""
+
+    illusts: collections.abc.Sequence[PixivIllust]
     """The illustrations."""
     next_url: str | None
     """The next page URL."""
+
+    def to_universal(self) -> base.Page[base.Post]:
+        """Convert the resource to a universal paginated resource."""
+        return base.Page(
+            items=[illust.to_universal() for illust in self.illusts],
+            next=self.get_next_query("max_bookmark_id"),
+        )
+
+
+class PixivPaginatedUsers(PixivPaginatedResource):
+    """Pixiv paginated users."""
+
+    users: collections.abc.Sequence[PixivUser]
+    """The users."""
+
+    def to_universal(self) -> base.Page[base.User]:
+        """Convert the resource to a universal paginated resource."""
+        return base.Page(
+            items=[user.to_universal() for user in self.users],
+            next=self.get_next_query(),
+        )
+
+
+class PixivPaginatedUserPreviews(PixivPaginatedResource):
+    """Pixiv paginated user previews."""
+
+    user_previews: collections.abc.Sequence[PixivUserPreview]
+    """The user previews."""
+
+    def to_universal(self) -> base.Page[base.User]:
+        """Convert the resource to a universal paginated resource."""
+        return base.Page(
+            items=[user.to_universal() for user in self.user_previews],
+            next=self.get_next_query(),
+        )

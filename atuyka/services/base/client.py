@@ -50,6 +50,7 @@ class ServiceClientMeta(abc.ABCMeta):
     """Metaclass for service clients."""
 
     service_name: str | None = None
+    url: str | None = None
     requires_authorization: bool = True
 
     def __init__(
@@ -59,10 +60,12 @@ class ServiceClientMeta(abc.ABCMeta):
         namespace: dict[str, object],
         *,
         service: str | None = None,
+        url: str | None = None,
         auth: bool = False,
         **kwargs: object,
     ) -> None:
         cls.service_name = service
+        cls.url = url
         cls.requires_authorization = auth
         super().__init__(name, bases, namespace)
 

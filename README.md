@@ -1,6 +1,8 @@
 # atuyka
 
-Backend to view and various art and video related social media with a focus on asian sites.
+Backend to view and various art and video related social media with a focus on east-asian sites.
+
+Currently under development, bloat and repetitions are to be expected until the API is stabilized.
 
 ---
 

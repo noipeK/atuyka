@@ -50,10 +50,10 @@ class Connection(pydantic.BaseModel):
 
     url: str
     """The service URL."""
-    id: str | None = None
-    """The target ID."""
-    author_id: str | None = None
-    """The author of the target ID."""
+    post_id: str | None = None
+    """The target post ID."""
+    user_id: str | None = None
+    """The target user ID."""
 
 
 class Mention(pydantic.BaseModel):
@@ -61,6 +61,7 @@ class Mention(pydantic.BaseModel):
 
     url: str
     """The URL of the mentioned resource."""
+    # TODO: Analyze the URL
 
 
 class AttachmentURL(pydantic.BaseModel):
