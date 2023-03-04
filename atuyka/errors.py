@@ -8,6 +8,7 @@ __all__ = [
     "InvalidServiceError",
     "InvalidTokenError",
     "MissingTokenError",
+    "MissingUserIDError",
     "PrivateResourceError",
     "RateLimitedError",
     "ServiceError",
@@ -24,6 +25,7 @@ class AtuykaError(Exception):
 
     def __init__(self, service: str, message: str | None = None) -> None:
         self.service = service
+        self.message = message or self.message
         super().__init__(self.message)
 
 
@@ -60,6 +62,18 @@ class InvalidServiceError(ServiceError):
         super().__init__(service, f"Service {service!r} not found, must be one of: {', '.join(services)!r}")
 
 
+class MissingEndpointError(ServiceError):
+    """Missing endpoint error."""
+
+    message = "Missing endpoint"
+
+    endpoint: str
+
+    def __init__(self, service: str, endpoint: str) -> None:
+        self.endpoint = endpoint
+        super().__init__(service, f"Endpoint {endpoint!r} not found for service {service!r}")
+
+
 class InvalidResourceError(ServiceError):
     """Invalid resource error."""
 
@@ -82,6 +96,18 @@ class SuspendedResourceError(InvalidResourceError):
     def __init__(self, service: str, resource: str) -> None:
         self.resource = resource
         super().__init__(service, resource, f"Resource {resource!r} is suspended for service {service!r}")
+
+
+class MissingUserIDError(InvalidResourceError):
+    """Missing ID error."""
+
+    message = "Missing user ID"
+
+    suggestion: str | None
+
+    def __init__(self, service: str, suggestion: str | None = None) -> None:
+        self.suggestion = suggestion
+        super().__init__(service, "", f"ID is missing for service {service!r}")
 
 
 class InvalidIDError(InvalidResourceError):
@@ -131,4 +157,4 @@ class PrivateResourceError(AuthenticationError):
 
     def __init__(self, service: str, resource: str) -> None:
         self.resource = resource
-        super().__init__(f"Resource {resource!r} is private for service {service!r}")
+        super().__init__(service, f"Resource {resource!r} is private for service {service!r}")

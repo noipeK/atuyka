@@ -12,10 +12,6 @@ import typing_extensions
 from . import models
 
 __all__ = [
-    "BufferedPaginator",
-    "MergedPaginator",
-    "Paginator",
-    "UniversalPaginator",
     "paginate",
 ]
 
@@ -268,6 +264,9 @@ class UniversalPaginator(typing.Generic[T], BufferedPaginator[T]):
     endpoint: typing.Callable[..., typing.Awaitable[models.Page[T]]]
     _next_params: collections.abc.Mapping[str, typing.Any] | None
 
+    total: int | None
+    remaining: int | None
+
     def __init__(
         self,
         endpoint: typing.Callable[..., typing.Awaitable[models.Page[T]]],
@@ -277,6 +276,8 @@ class UniversalPaginator(typing.Generic[T], BufferedPaginator[T]):
         super().__init__(limit=limit)
         self.endpoint = endpoint
         self._next_params = {}
+        self.total = None
+        self.remaining = None
 
     async def next_page(self) -> collections.abc.Iterable[T] | None:
         """Get the next page of the paginator."""
@@ -285,14 +286,19 @@ class UniversalPaginator(typing.Generic[T], BufferedPaginator[T]):
 
         page = await self.endpoint(**self._next_params)
         self._next_params = page.next
+        self.total = page.total
+        self.remaining = page.remaining
+
         return page.items
 
 
-def paginate(callback: typing.Callable[P, typing.Awaitable[models.Page[T]]]) -> typing.Callable[P, Paginator[T]]:
+def paginate(
+    callback: typing.Callable[P, typing.Awaitable[models.Page[T]]],
+) -> typing.Callable[P, UniversalPaginator[T]]:
     """Create a paginator from an endpoint."""
 
     @functools.wraps(callback)
-    def wrapper(*args: P.args, **kwargs: P.kwargs) -> Paginator[T]:
+    def wrapper(*args: P.args, **kwargs: P.kwargs) -> UniversalPaginator[T]:
         return UniversalPaginator(functools.partial(callback, *args, **kwargs))
 
     return wrapper

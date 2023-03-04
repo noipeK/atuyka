@@ -123,46 +123,62 @@ class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
     async def __aexit__(self, *exc: typing.Any) -> None:
         await self.close()
 
+    @property
     @abc.abstractmethod
-    async def get_user(self, user: str | None = ..., **kwargs: object) -> models.User:
+    def my_user_id(self) -> str | None:
+        """Logged-in user's ID."""
+
+    @abc.abstractmethod
+    async def get_user(self, user: str | None = ..., /, **kwargs: object) -> models.User:
         """Get user."""
 
     @abc.abstractmethod
-    async def get_liked_posts(self, user: str | None = ..., **kwargs: object) -> models.Page[models.Post]:
+    async def get_liked_posts(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
         """Get liked posts."""
 
     @abc.abstractmethod
-    async def get_following(self, user: str | None = ..., **kwargs: object) -> models.Page[models.User]:
+    async def get_following(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.User]:
         """Get following users."""
 
     @abc.abstractmethod
-    async def get_followers(self, user: str | None = ..., **kwargs: object) -> models.Page[models.User]:
+    async def get_followers(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.User]:
         """Get followers."""
 
     @abc.abstractmethod
-    async def get_posts(self, user: str, **kwargs: object) -> models.Page[models.Post]:
+    async def get_posts(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
         """Get posts made by a user."""
 
     @abc.abstractmethod
-    async def get_post(self, user: str, post: str, **kwargs: object) -> models.Post:
+    async def get_post(self, user: str | None, post: str, /, **kwargs: object) -> models.Post:
         """Get a post."""
 
     @abc.abstractmethod
-    async def get_similar_posts(self, user: str, post: str, **kwargs: object) -> models.Page[models.Post]:
+    async def get_comments(
+        self,
+        user: str | None,
+        post: str,
+        comment: str | None = ...,
+        /,
+        **kwargs: object,
+    ) -> models.Page[models.Comment]:
+        """Get comments."""
+
+    @abc.abstractmethod
+    async def get_similar_posts(self, user: str | None, post: str, /, **kwargs: object) -> models.Page[models.Post]:
         """Get similar posts."""
 
     @abc.abstractmethod
-    async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> models.Page[models.Post]:
+    async def get_following_feed(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
         """Get posts made by followed users."""
 
     @abc.abstractmethod
-    async def get_recommended_feed(self, user: str | None = ..., **kwargs: object) -> models.Page[models.Post]:
+    async def get_recommended_feed(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
         """Get recommended posts."""
 
     @abc.abstractmethod
-    async def search_posts(self, query: str | None = ..., **kwargs: object) -> models.Page[models.Post]:
+    async def search_posts(self, query: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
         """Search posts."""
 
     @abc.abstractmethod
-    async def search_users(self, query: str | None = ..., **kwargs: object) -> models.Page[models.User]:
+    async def search_users(self, query: str | None = ..., /, **kwargs: object) -> models.Page[models.User]:
         """Search users."""

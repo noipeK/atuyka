@@ -1,5 +1,6 @@
 """Twitter front-end API client."""
 import collections.abc
+import os
 import re
 import typing
 
@@ -7,6 +8,7 @@ import aiohttp
 import pydantic
 
 import atuyka.errors
+from atuyka import utility
 from atuyka.services import base
 
 from . import models
@@ -34,6 +36,8 @@ class TwitterError(typing.TypedDict):
 
 class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
     """Twitter front-end API client."""
+
+    NAME_CACHE: utility.Cache[str, str] = utility.Cache()
 
     auth_token: str | None
 
@@ -75,9 +79,13 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         return data["guest_token"]
 
     async def _generate_ct0(self) -> str:
-        """Generate the ct0 token."""
+        """Generate the ct0 token. Used for advertising."""
         async with aiohttp.request("GET", "https://twitter.com/i/release_notes") as response:
             return response.cookies["ct0"].value
+
+    def _generate_fake_ct0(self) -> str:
+        """Generate the ct0 token. Used for advertising."""
+        return hex(int.from_bytes(os.urandom(16), "big"))[2:]
 
     async def _generate_authenticity_token(self) -> str:
         """Generate the authenticity token."""
@@ -106,7 +114,8 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
             raise atuyka.errors.MissingTokenError("twitter")
 
         if not self.ct0:
-            self.ct0 = await self._generate_ct0()
+            self.ct0 = self._generate_fake_ct0()
+            # self.ct0 = await self._generate_ct0()
 
         return {
             "Origin": "https://twitter.com",
@@ -124,11 +133,18 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
 
         return await self.get_guest_headers()
 
+    async def start(self) -> None:
+        """Start the client."""
+        if self.auth_token:
+            await self._get_my_screen_name()
+
     def _raise_errors(self, error: TwitterError, *errors: TwitterError, url: str) -> typing.NoReturn:
         """Raise errors."""
         code, message = error["code"], error["message"]
         if code in (32,):
             raise atuyka.errors.InvalidTokenError("twitter", self.auth_token or "")
+        if code in (220,):
+            raise atuyka.errors.MissingUserIDError("twitter")
         if code in (34, 50):
             raise atuyka.errors.InvalidResourceError("twitter", url)
         if code in (63, 421, 422, 425):
@@ -212,8 +228,21 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         if self.my_screen_name:
             return self.my_screen_name
 
+        if self.auth_token and self.auth_token in self.NAME_CACHE:
+            self.my_screen_name = self.NAME_CACHE[self.auth_token]
+            return self.my_screen_name
+
         settings = await self._get_account_settings()
         self.my_screen_name = settings["screen_name"]
+
+        if self.auth_token:
+            self.NAME_CACHE[self.auth_token] = self.my_screen_name
+
+        return self.my_screen_name
+
+    @property
+    def my_user_id(self) -> str | None:
+        """The authenticated user's ID."""
         return self.my_screen_name
 
     async def _parse_user(self, user: int | str | None) -> collections.abc.Mapping[str, typing.Any]:
@@ -332,7 +361,7 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
-        page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
+        page = base.models.Page(items=posts, next=dict(since_id=str(tweets[-1].id)))
         return page
 
     async def get_following(
@@ -361,7 +390,7 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
 
     async def get_posts(
         self,
-        user: str,
+        user: str | None = None,
         *,
         since_id: int | None = None,
         max_id: int | None = None,
@@ -372,17 +401,27 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         tweets = await self.get_user_tweets(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
-        page = base.models.Page(items=posts, next=dict(since_id=tweets[-1].id))
+        page = base.models.Page(items=posts, next=dict(since_id=str(tweets[-1].id)))
         return page
 
-    async def get_post(self, user: str, post: str, **kwargs: object) -> base.models.Post:
+    async def get_post(self, user: str | None, post: str, **kwargs: object) -> base.models.Post:
         """Get a post."""
         tweet = await self.get_tweet(int(post))
         return tweet.to_universal()
 
-    async def get_similar_posts(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
-        """Get similar posts."""
+    async def get_comments(
+        self,
+        user: str | None,
+        post: str,
+        comment: str | None = None,
+        **kwargs: object,
+    ) -> typing.NoReturn:
+        """Get comments."""
         raise NotImplementedError
+
+    async def get_similar_posts(self, user: str | None, post: str, **kwargs: object) -> typing.NoReturn:
+        """Get similar posts."""
+        raise atuyka.errors.MissingEndpointError("twitter", "posts/similar")
 
     async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get posts made by followed users."""

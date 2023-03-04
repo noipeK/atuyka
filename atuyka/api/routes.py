@@ -1,5 +1,6 @@
 """FastAPI atuyka routes."""
 import collections.abc
+import logging
 
 import fastapi
 import fastapi.param_functions as params
@@ -31,13 +32,13 @@ router: fastapi.APIRouter = fastapi.APIRouter(tags=["services"])
 
 def _parse_user(user: str | None) -> str | None:
     """Parse a user identifier."""
-    if user and user != "me" and user != "0":
+    if user and user != "me":
         return user
 
     return None
 
 
-async def get_client(
+async def dependency_client(
     request: starlette.requests.Request,
     response: starlette.responses.Response,
     service: str = params.Query(description="Target service slug.", example="twitter"),
@@ -55,10 +56,30 @@ async def get_client(
     client = atuyka.services.ServiceClient.create(service, token)
     await client.start()
 
+    if client.my_user_id:
+        response.set_cookie(f"{service}_id", client.my_user_id)
+
     try:
         yield client
     finally:
         await client.close()
+
+
+async def dependency_user_id(
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str | None = params.Path("me", description="User identifier.", example="me"),
+) -> str | None:
+    """Get a user ID."""
+    if user and user != "me" and user != "0":
+        return user
+
+    service = client.__class__.service_name or ""
+    raise atuyka.errors.MissingUserIDError(service, client.my_user_id)
+
+
+async def dependency_post_id(post: str = params.Path(description="Post identifier.")) -> str:
+    """Get a post ID."""
+    return post
 
 
 @router.get("/services")
@@ -73,21 +94,155 @@ async def get_services() -> list[atuyka.services.models.AtuykaService]:
     ]
 
 
+@router.get("/users/me/id")
+async def get_my_user_id(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+) -> collections.abc.Sequence[str]:
+    """Get my user ID."""
+    return [client.my_user_id] if client.my_user_id else []
+
+
+@router.get("/users/{user}")
+async def get_user(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+) -> atuyka.services.models.User:
+    """Get a user."""
+    return await client.get_user(user, **request.query_params)
+
+
 @router.get("/users/{user}/likes")
 async def get_liked_posts(
     request: starlette.requests.Request,
-    client: atuyka.services.ServiceClient = fastapi.Depends(get_client),
-    user: str | None = params.Path("me", description="User identifier.", example="me"),
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
 ) -> atuyka.services.models.Page[atuyka.services.models.Post]:
     """Get liked posts."""
-    user = _parse_user(user)
     return await client.get_liked_posts(user, **request.query_params)
+
+
+@router.get("/users/{user}/following")
+async def get_following(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+) -> atuyka.services.models.Page[atuyka.services.models.User]:
+    """Get followed users."""
+    return await client.get_following(user, **request.query_params)
+
+
+@router.get("/users/{user}/followers")
+async def get_followers(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+) -> atuyka.services.models.Page[atuyka.services.models.User]:
+    """Get followers."""
+    return await client.get_followers(user, **request.query_params)
+
+
+@router.get("/users/{user}/posts")
+async def get_posts(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+) -> atuyka.services.models.Page[atuyka.services.models.Post]:
+    """Get posts."""
+    return await client.get_posts(user, **request.query_params)
+
+
+@router.get("/users/{user}/posts/{post}")
+async def get_post(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Post:
+    """Get a post."""
+    return await client.get_post(user, post, **request.query_params)
+
+
+@router.get("/posts/{post}")
+async def get_post_alt(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Post:
+    """Get a post."""
+    return await client.get_post(None, post, **request.query_params)
+
+
+@router.get("/users/{user}/posts/{post}/comments")
+async def get_comments(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Page[atuyka.services.models.Comment]:
+    """Get comments."""
+    return await client.get_comments(user, post, **request.query_params)
+
+
+@router.get("/posts/{post}/comments")
+async def get_comments_alt(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Page[atuyka.services.models.Comment]:
+    """Get comments."""
+    return await client.get_comments(None, post, **request.query_params)
+
+
+@router.get("/users/{user}/posts/{post}/comments/{comment}/comments")
+async def get_comment_replies(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+    post: str = fastapi.Depends(dependency_post_id),
+    comment: str = fastapi.Path(..., description="Comment identifier"),
+) -> atuyka.services.models.Page[atuyka.services.models.Comment]:
+    """Get comment replies."""
+    return await client.get_comments(user, post, comment, **request.query_params)
+
+
+@router.get("/posts/{post}/comments/{comment}/comments")
+async def get_comment_replies_alt(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    post: str = fastapi.Depends(dependency_post_id),
+    comment: str = fastapi.Path(..., description="Comment identifier"),
+) -> atuyka.services.models.Page[atuyka.services.models.Comment]:
+    """Get comment replies."""
+    return await client.get_comments(None, post, comment, **request.query_params)
+
+
+@router.get("/users/{user}/posts/{post}/similar")
+async def get_similar_posts(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    user: str = fastapi.Depends(dependency_user_id),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Page[atuyka.services.models.Post]:
+    """Get similar posts."""
+    return await client.get_similar_posts(user, post, **request.query_params)
+
+
+@router.get("/posts/{post}/similar")
+async def get_similar_posts_alt(
+    request: starlette.requests.Request,
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    post: str = fastapi.Depends(dependency_post_id),
+) -> atuyka.services.models.Page[atuyka.services.models.Post]:
+    """Get similar posts."""
+    return await client.get_similar_posts(None, post, **request.query_params)
 
 
 def exception_handler(
     request: starlette.requests.Request,
     exc: atuyka.errors.AtuykaError,
-) -> starlette.responses.JSONResponse:
+) -> starlette.responses.Response:
     """Handle atuyka exceptions."""
     data = {}
 
@@ -97,6 +252,11 @@ def exception_handler(
         case atuyka.errors.InvalidServiceError(available_services=available_services):
             status_code = 404
             data = {"available_services": available_services}
+        case atuyka.errors.MissingUserIDError(suggestion=suggestion) if suggestion is not None:
+            url = request.url.replace(path=request.url.path.replace("/me", f"/{suggestion}", 1))
+            return starlette.responses.RedirectResponse(url)
+        case atuyka.errors.MissingUserIDError:
+            status_code = 422
         case atuyka.errors.InvalidIDError(id=id):
             status_code = 404
             data = {"id": id}
@@ -111,9 +271,12 @@ def exception_handler(
             data = {"token": token}
         case atuyka.errors.AuthenticationError:
             status_code = 401
+        case atuyka.errors.ServiceError:
+            status_code = 400
         case _:
             status_code = 500
             error_type = "Internal"
+            logging.exception(exc)
 
     return starlette.responses.JSONResponse(
         status_code=status_code,
@@ -129,4 +292,5 @@ def upgrade_response_model(router: fastapi.routing.APIRouter) -> None:
 
 
 if __name__ != "__main__":
+    # include defaults only when debugging
     upgrade_response_model(router)

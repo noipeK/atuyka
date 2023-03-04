@@ -24,11 +24,6 @@ def get_filename(url: str) -> str:
     return url.split("/")[-1]
 
 
-def to_routed_url(service: str, url: str) -> str:
-    """Convert a URL to a routed URL."""
-    return "/resources/" + service + "/" + quote_url(url)
-
-
 class AtuykaService(pydantic.BaseModel):
     """An Atuyka service."""
 
@@ -71,9 +66,9 @@ class AttachmentURL(pydantic.BaseModel):
     """The service name."""
 
     width: int | None = None
-    """The attachment width."""
+    """The attachment width. Mostly not reliable, fetch image headers for real values."""
     height: int | None = None
-    """The attachment height."""
+    """The attachment height. Mostly not reliable, fetch image headers for real values."""
     duration: float | None = None
     """The video duration in seconds."""
 
@@ -86,8 +81,6 @@ class AttachmentURL(pydantic.BaseModel):
 
     url: str
     """The original attachment URL."""
-    routed_url: str | None = None
-    """The relative routed attachment URL."""
     alt_url: str | None = None
     """Link to the attachment on an alternative front-end of the service."""
 
@@ -96,7 +89,6 @@ class AttachmentURL(pydantic.BaseModel):
         """Add the routed URL."""
         values["filename"] = values.get("filename") or get_filename(values["url"])
         values["content_type"] = values.get("content_type") or mimetypes.guess_type(values["url"])[0]
-        values["routed_url"] = values.get("routed_url") or to_routed_url(values["service"], values["url"])
 
         return values
 
@@ -180,6 +172,42 @@ class User(pydantic.BaseModel):
     """Whether the author is being followed by the authenticated user."""
 
 
+class Comment(pydantic.BaseModel):
+    """A post comment."""
+
+    service: str
+    """The service name."""
+
+    created_at: datetime.datetime
+    """The comment creation date."""
+    id: str
+    """The unique comment ID."""
+    content: str
+    """The comment text."""
+    url: str
+    """Link to the comment on the service."""
+    alt_url: str | None = None
+    """Link to the comment on an alternative front-end of the service."""
+    author: User
+    """The comment author."""
+    parent_id: str | None = None
+    """The parent comment ID."""
+    likes: int | None = None
+    """The amount of likes."""
+    views: int | None = None
+    """The amount of views."""
+    replies: int | None = None
+    """The amount of replies."""
+    available_replies: collections.abc.Sequence["Comment"] = []
+    """Available replies"""
+    mentions: collections.abc.Sequence[Mention] = []
+    """The comment mentions."""
+    attachments: collections.abc.Sequence[Attachment] = []
+    """The post attachments."""
+    language: str | None = None
+    """The comment language."""
+
+
 class Post(pydantic.BaseModel):
     """A post."""
 
@@ -232,5 +260,5 @@ class Page(pydantic.generics.GenericModel, typing.Generic[T]):
     """The total amount of items."""
     remaining: int | None = None
     """The remaining amount of items."""
-    next: collections.abc.Mapping[str, int | str] | None = None
+    next: collections.abc.Mapping[str, str] | None = None
     """The parameters for the next page."""

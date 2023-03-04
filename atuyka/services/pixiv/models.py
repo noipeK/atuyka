@@ -3,10 +3,10 @@ import collections.abc
 import datetime
 import re
 import typing
-import urllib.parse
 
 import pydantic
 import pydantic.generics
+from pixivpy_async.utils import Utils as pixivpy_utils  # noqa: N813 # pyright: ignore[reportUnknownVariableType]
 
 from atuyka.services.base import client as base_client
 from atuyka.services.base import models as base
@@ -42,10 +42,10 @@ class PixivImageURLs(pydantic.BaseModel):
         urls: dict[str, base.AttachmentURL] = {}
         for size, (width, height), template in [
             ("thumbnail", (540, 540), "https://i.pximg.net/c/540x540_10_webp/img-master/{}_square1200.jpg"),
-            ("small", (None, 540), "https://i.pximg.net/c/540x540_70/img-master/{}_master1200.jpg"),
-            ("medium", (None, None), "https://i.pximg.net/c/600x1200_90_webp/img-master/{}_master1200.jpg"),
-            ("large", (None, None), "https://i.pximg.net/img-master/{}_master1200.jpg"),
-            ("original", (None, None), "https://i.pximg.net/img-original/{}.png"),
+            ("small", (540, 540), "https://i.pximg.net/c/540x540_70/img-master/{}_master1200.jpg"),
+            ("medium", (600, None), "https://i.pximg.net/c/600x1200_90_webp/img-master/{}_master1200.jpg"),
+            ("large", (None, 1200), "https://i.pximg.net/img-master/{}_master1200.jpg"),
+            ("original", (None, None), "https://i.pximg.net/img-original/{}.jpg"),
         ]:
             url = template.format(substring)
             urls[size] = base.AttachmentURL(
@@ -74,15 +74,31 @@ class PixivProfileImageURLs(pydantic.BaseModel):
 
     def to_universal(self) -> base.Attachment:
         """Convert to a universal attachment URL."""
+        if "no_profile" in self.medium:
+            return base.Attachment(
+                service="pixiv",
+                original=base.AttachmentURL(
+                    service="pixiv",
+                    width=170,
+                    height=170,
+                    url=self.medium,
+                    alt_url=None,  # pixiv.moe doesn't proxy this
+                ),
+            )
+
         return base.Attachment(
             service="pixiv",
             small=base.AttachmentURL(
                 service="pixiv",
+                width=50,
+                height=50,
                 url=self.medium.replace("_170", "_50"),
                 alt_url=_to_alt_image(self.medium.replace("_170", "_50")),
             ),
             medium=base.AttachmentURL(
                 service="pixiv",
+                width=170,
+                height=170,
                 url=self.medium,
                 alt_url=_to_alt_image(self.medium),
             ),
@@ -121,8 +137,8 @@ class PixivUser(pydantic.BaseModel):
     """The user profile image URLs."""
     comment: str | None
     """The user bio. Only in user details."""
-    is_followed: bool
-    """Whether the user is being followed by the authenticated user."""
+    is_followed: bool | None
+    """Whether the user is being followed by the authenticated user. Not present in comments."""
     is_access_blocking_user: bool | None
     """Whether the authenticated user blocked this user. Only in user details."""
 
@@ -158,6 +174,37 @@ class PixivSeries(pydantic.BaseModel):
     """The series ID."""
     title: str
     """The series title."""
+
+
+class PixivComment(pydantic.BaseModel):
+    """A pixiv comment."""
+
+    id: int
+    """The comment ID."""
+    comment: str
+    """The comment text."""
+    date: datetime.datetime
+    """The comment creation date."""
+    user: PixivUser
+    """The comment author."""
+    parent_comment: "PixivComment | None"
+    """The parent comment, if any."""
+
+    @pydantic.validator("parent_comment", pre=True)
+    def __remove_empty_dict(cls, v: dict[str, object]) -> object:
+        return v or None
+
+    def to_universal(self) -> base.Comment:
+        """Convert to a universal comment."""
+        return base.Comment(
+            service="pixiv",
+            id=str(self.id),
+            created_at=self.date,
+            content=self.comment,
+            url="https://www.pixiv.net/",
+            author=self.user.to_universal(),
+            parent_id=str(self.parent_comment.id) if self.parent_comment else None,
+        )
 
 
 class PixivIllust(pydantic.BaseModel):
@@ -395,14 +442,29 @@ class PixivPaginatedResource(pydantic.BaseModel):
     next_url: str | None
     """The next page URL."""
 
-    def get_next_query(self, key: str = "offset") -> collections.abc.Mapping[str, str] | None:
+    def get_next_query(self, key: str | list[str] = "offset") -> collections.abc.Mapping[str, str] | None:
         """Convert the resource to a universal paginated resource."""
         if self.next_url is None:
             return None
 
-        parsed = urllib.parse.urlparse(self.next_url)
-        query = dict(urllib.parse.parse_qsl(parsed.query))
-        return {key: query[key]}
+        keys = [key] if isinstance(key, str) else key
+
+        # pixiv uses php query arrays (e.g. ?a[0]=1&a[1]=2)
+        # we use comma separated values (e.g. ?a=1,2)
+        raw_query: dict[str, str | list[str]] = pixivpy_utils.parse_qs(self.next_url)  # pyright: ignore
+
+        query: dict[str, str] = {}
+        for key in keys:
+            value = raw_query.get(key)
+            if not value:
+                continue
+
+            if isinstance(value, list):
+                query[key] = ",".join(value)
+            else:
+                query[key] = value
+
+        return query
 
 
 class PixivPaginatedIllusts(PixivPaginatedResource):
@@ -415,7 +477,7 @@ class PixivPaginatedIllusts(PixivPaginatedResource):
         """Convert the resource to a universal paginated resource."""
         return base.Page(
             items=[illust.to_universal() for illust in self.illusts],
-            next=self.get_next_query(),
+            next=self.get_next_query(["offset", "seed_illust_ids", "viewed"]),
         )
 
 
@@ -459,5 +521,41 @@ class PixivPaginatedUserPreviews(PixivPaginatedResource):
         """Convert the resource to a universal paginated resource."""
         return base.Page(
             items=[user.to_universal() for user in self.user_previews],
+            next=self.get_next_query(),
+        )
+
+
+class PixivPaginatedComments(PixivPaginatedResource):
+    """Pixiv paginated comments."""
+
+    total_comments: int
+    """The total number of comments."""
+
+    comments: collections.abc.Sequence[PixivComment]
+    """The comments."""
+
+    def to_universal(self) -> base.Page[base.Comment]:
+        """Convert the resource to a universal paginated resource."""
+        comments: dict[str, base.Comment] = {str(comment.id): comment.to_universal() for comment in self.comments}
+
+        root_comments: list[base.Comment] = []
+        children_comments: dict[str, list[base.Comment]] = {}
+        for comment in comments.values():
+            if comment.parent_id:
+                children_comments.setdefault(comment.parent_id, []).append(comment)
+            else:
+                root_comments.append(comment)
+
+        stack = root_comments.copy()
+        while stack:
+            parent_comment = stack.pop()
+            children = children_comments.get(parent_comment.id)
+            if children:
+                parent_comment.available_replies = children
+                stack.extend(children)
+
+        return base.Page(
+            items=root_comments,
+            total=self.total_comments,
             next=self.get_next_query(),
         )

@@ -2,5 +2,6 @@
 
 Provides a base client and models.
 """
-from . import models, paginator
+from . import models
 from .client import *
+from .paginator import *

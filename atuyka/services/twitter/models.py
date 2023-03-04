@@ -802,7 +802,7 @@ class Cursor(pydantic.BaseModel):
         return base.Page(
             items=items,
             remaining=self.total_count,
-            next={"cursor": self.next_cursor} if self.next_cursor else None,
+            next={"cursor": str(self.next_cursor)} if self.next_cursor else None,
         )
 
 

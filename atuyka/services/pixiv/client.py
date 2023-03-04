@@ -1,11 +1,13 @@
 """Pixiv client."""
 import asyncio
+import collections.abc
 import typing
 
 import pixivpy_async as pixivpy
 import pydantic
 
 import atuyka.errors
+from atuyka import utility
 from atuyka.services import base
 
 from . import models
@@ -17,6 +19,9 @@ __all__ = ["Pixiv"]
 
 class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
     """Pixiv client."""
+
+    # TODO: Encode with the token
+    CACHED_TOKENS: utility.Cache[str, dict[str, object]] = utility.Cache()
 
     token: str | None
 
@@ -54,7 +59,21 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
             await self.api.login_web()
             return
 
+        if self.token in self.CACHED_TOKENS:
+            parts = self.CACHED_TOKENS[self.token]
+            self.api.access_token = parts["access_token"]
+            self.api.refresh_token = parts["refresh_token"]
+            self.api.user_id = parts["user_id"]
+
+            return
+
         await self.api.login(refresh_token=self.token)  # pyright: reportUnknownMemberType=false
+
+        self.CACHED_TOKENS[self.token] = {
+            "access_token": self.api.access_token,
+            "refresh_token": self.api.refresh_token,
+            "user_id": self.api.user_id,
+        }
 
     async def close(self) -> None:
         """Close the client."""
@@ -65,6 +84,11 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
     def user_id(self) -> int:
         """Authenticated user ID."""
         return self.api.user_id  # pyright: reportUnknownMemberType=false
+
+    @property
+    def my_user_id(self) -> str | None:
+        """Logged-in user's ID."""
+        return str(self.user_id)
 
     def _parse_user(self, user: str | int | None) -> int:
         """Parse user ID."""
@@ -153,6 +177,41 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
         data = await self.api.illust_detail(illust_id)
         return pydantic.parse_obj_as(models.PixivIllust, data.illust)
 
+    async def get_illust_comments(
+        self,
+        illust_id: int,
+        *,
+        offset: int | None = None,
+    ) -> models.PixivPaginatedComments:
+        """Get illust comments."""
+        data = await self.api.illust_comments(illust_id, offset=offset, include_total_comments=True)
+        return pydantic.parse_obj_as(models.PixivPaginatedComments, data)
+
+    async def get_related_illusts(
+        self,
+        illust_id: int,
+        *,
+        offset: int | None = None,
+        seed_illust_ids: collections.abc.Collection[str] | None = None,
+        viewed: collections.abc.Collection[str] | None = None,
+    ) -> models.PixivPaginatedIllusts:
+        """Get related illusts."""
+        # self.api.illust_related does not support viewed, only seed_illust_ids
+        # set_params does not support proper serialization of seed_illust_ids
+        method, url = self.api.api.illust_related
+        params: dict[str, str] = self.api.set_params(
+            illust_id=illust_id,
+            offset=offset,
+            filter="for_ios",
+            viewed=list(viewed) if viewed else None,
+        )
+        id_params: dict[str, str] = self.api.set_params(viewed=list(seed_illust_ids) if seed_illust_ids else None)
+        for key, param in id_params.items():
+            params[key.replace("viewed", "seed_illust_ids")] = param
+
+        data = await self.api.requests_(method=method, url=url, params=params)
+        return pydantic.parse_obj_as(models.PixivPaginatedIllusts, data)
+
     # ------------------------------------------------------------
     # UNIVERSAL:
 
@@ -207,14 +266,42 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
         data = await self.get_user_illusts(self._parse_user(user), offset=offset)
         return data.to_universal()
 
-    async def get_post(self, user: str, post: str, **kwargs: object) -> base.models.Post:
+    async def get_post(self, user: str | None, post: str, **kwargs: object) -> base.models.Post:
         """Get an illust."""
         illust = await self.get_illust_details(int(post))
         return illust.to_universal()
 
-    async def get_similar_posts(self, user: str, post: str, **kwargs: object) -> typing.NoReturn:
+    async def get_comments(
+        self,
+        user: str | None,
+        post: str,
+        comment: str | None = None,
+        *,
+        offset: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.Comment]:
+        """Get comments."""
+        data = await self.get_illust_comments(int(post), offset=offset)
+        return data.to_universal()
+
+    async def get_similar_posts(
+        self,
+        user: str | None,
+        post: str,
+        *,
+        offset: int | None = None,
+        seed_illust_ids: str | None = None,
+        viewed: str | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.Post]:
         """Get similar posts."""
-        raise NotImplementedError
+        data = await self.get_related_illusts(
+            int(post),
+            offset=offset,
+            seed_illust_ids=seed_illust_ids.split(",") if seed_illust_ids else None,
+            viewed=viewed.split(",") if viewed else None,
+        )
+        return data.to_universal()
 
     async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Get posts made by followed users."""
