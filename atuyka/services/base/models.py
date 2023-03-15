@@ -242,6 +242,10 @@ class Post(pydantic.BaseModel):
     """The post connections."""
     mentions: collections.abc.Sequence[Mention] = []
     """The post mentions."""
+    comment_previews: collections.abc.Sequence[Comment] = []
+    """The post comment previews."""
+    captioned_post: "Post | None" = None
+    """The post that is being captioned."""
     nsfw: bool | None = None
     """Whether the post is NSFW."""
     language: str | None = None

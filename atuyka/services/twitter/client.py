@@ -138,9 +138,13 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         if self.auth_token:
             await self._get_my_screen_name()
 
-    def _raise_errors(self, error: TwitterError, *errors: TwitterError, url: str) -> typing.NoReturn:
+    def _raise_errors(self, error: TwitterError | str, *errors: TwitterError, url: str) -> typing.NoReturn:
         """Raise errors."""
-        code, message = error["code"], error["message"]
+        if isinstance(error, str):
+            code, message = 0, error
+        else:
+            code, message = error["code"], error["message"]
+
         if code in (32,):
             raise atuyka.errors.InvalidTokenError("twitter", self.auth_token or "")
         if code in (220,):
@@ -151,6 +155,9 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
             raise atuyka.errors.SuspendedResourceError("twitter", url)
         if code in (88,):
             raise atuyka.errors.RateLimitedError("twitter")
+
+        if message == "Not authorized.":
+            raise atuyka.errors.PrivateResourceError("twitter", url)
 
         raise atuyka.errors.ServiceError("twitter", message)
 

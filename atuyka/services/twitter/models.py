@@ -146,7 +146,7 @@ class TwitterMediaEntity(pydantic.BaseModel):
     """Sizes of the original media."""
     sizes: TwitterMediaSizes
     """Sizes of the media."""
-    features: TwitterMediaEntityFeatures
+    features: TwitterMediaEntityFeatures | None
     """Faces in the media."""
 
     def to_universal(self) -> base.Attachment:
@@ -303,7 +303,7 @@ class TwitterMedia(pydantic.BaseModel):
     """Sizes of the media."""
     video_info: TwitterVideoInfo | None
     """IDK."""
-    features: TwitterMediaFeatures
+    features: TwitterMediaFeatures | None
     """Media features."""
     media_key: str
     """IDK."""
@@ -707,6 +707,8 @@ class Tweet(pydantic.BaseModel):
     """IDK."""
     contributors: object | None
     """IDK."""
+    retweeted_status: Tweet | None
+    """The original tweet if this is a retweet."""
     is_quote_status: bool
     """Whether the tweet is a quote."""
     retweet_count: int
@@ -766,7 +768,6 @@ class Tweet(pydantic.BaseModel):
             id=self.id_str,
             url=f"https://twitter.com/{self.user.screen_name}/status/{self.id_str}",
             alt_url=f"https://nitter.net/{self.user.screen_name}/status/{self.id_str}",
-            title=None,
             description=text,
             likes=self.favorite_count,
             attachments=attachments,
@@ -774,6 +775,7 @@ class Tweet(pydantic.BaseModel):
             author=self.user.to_universal(),
             connections=[],  # TODO: No viable connections to Twitter posts
             mentions=[base.Mention(url=url.expanded_url) for url in self.entities.urls],
+            captioned_post=self.retweeted_status.to_universal() if self.retweeted_status else None,
             nsfw=self.possibly_sensitive or None,
             language=self.lang,
             liked=self.favorited,
