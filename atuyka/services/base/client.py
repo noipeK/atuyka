@@ -14,6 +14,7 @@ import warnings
 import typing_extensions
 
 import atuyka.errors
+import atuyka.utility
 
 from . import models
 
@@ -39,7 +40,7 @@ def load_services(
         try:
             module = importlib.import_module("atuyka.services." + module_name)
         except BaseException as e:  # noqa: BLE001  # bare except
-            warnings.warn(f"Failed to import {module_name}: {e}")
+            warnings.warn(f"Failed to import {module_name}: {e}", stacklevel=2)
         else:
             imported.append(module)
 
@@ -182,3 +183,19 @@ class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
     @abc.abstractmethod
     async def search_users(self, query: str | None = ..., /, **kwargs: object) -> models.Page[models.User]:
         """Search users."""
+
+    @abc.abstractmethod
+    def _proxy(self, url: str, /, **kwargs: object) -> atuyka.utility.ProxyContextType:
+        """Proxy a url.
+
+        Returns a stream and headers.
+        """
+
+    def proxy(self, url: str, /, **kwargs: object) -> atuyka.utility.ProxyStream:
+        """Proxy a url."""
+        return atuyka.utility.ProxyStream(self._proxy(url, **kwargs))
+
+    async def download(self, url: str, /, **kwargs: object) -> bytes:
+        """Download a url."""
+        async with self.proxy(url, **kwargs) as stream:
+            return await stream.read()

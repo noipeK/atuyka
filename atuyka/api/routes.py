@@ -1,6 +1,7 @@
 """FastAPI atuyka routes."""
 import collections.abc
 import logging
+import typing
 
 import fastapi
 import fastapi.param_functions as params
@@ -12,6 +13,8 @@ import atuyka.errors
 import atuyka.services
 
 __all__ = ["exception_handler", "router"]
+
+T = typing.TypeVar("T")
 
 # /users/...
 # /users/.../likes
@@ -28,14 +31,6 @@ __all__ = ["exception_handler", "router"]
 
 
 router: fastapi.APIRouter = fastapi.APIRouter(tags=["services"])
-
-
-def _parse_user(user: str | None) -> str | None:
-    """Parse a user identifier."""
-    if user and user != "me":
-        return user
-
-    return None
 
 
 async def dependency_client(
@@ -67,7 +62,7 @@ async def dependency_client(
 
 async def dependency_user_id(
     client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
-    user: str | None = params.Path("me", description="User identifier.", example="me"),
+    user: str = params.Path(description="User identifier.", example="me"),
 ) -> str | None:
     """Get a user ID."""
     if user and user != "me" and user != "0":
@@ -237,6 +232,42 @@ async def get_similar_posts_alt(
 ) -> atuyka.services.models.Page[atuyka.services.models.Post]:
     """Get similar posts."""
     return await client.get_similar_posts(None, post, **request.query_params)
+
+
+PROXY_HEADERS = (
+    "x-status-code",
+    "accept-ranges",
+    "age",
+    "Cache-control",
+    "content-encoding",
+    "content-length",
+    "content-type",
+    "expires",
+    "last-modified",
+)
+
+
+@router.get("/proxy")
+async def proxy(
+    url: str = fastapi.Query(..., description="URL to proxy"),
+    client: atuyka.services.ServiceClient = fastapi.Depends(dependency_client),
+    range_header: str | None = fastapi.Header(None, alias="Range", include_in_schema=False),
+) -> starlette.responses.Response:
+    """Proxy a request."""
+    request_headers = {"Range": range_header}
+    request_headers = {k: v for k, v in request_headers.items() if v is not None}
+
+    proxied_stream = client.proxy(url, headers=request_headers)
+    headers = await proxied_stream.get_headers()
+
+    accepted_headers = {k.lower(): v for k, v in headers.items() if k.lower() in PROXY_HEADERS}
+    accepted_headers["x-proxy-url"] = url
+
+    return starlette.responses.StreamingResponse(
+        proxied_stream.stream,
+        status_code=int(accepted_headers.get("x-status-code", 200)),
+        headers=accepted_headers,
+    )
 
 
 def exception_handler(

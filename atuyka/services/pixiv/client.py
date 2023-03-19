@@ -1,13 +1,15 @@
 """Pixiv client."""
 import asyncio
 import collections.abc
+import contextlib
 import typing
 
+import aiohttp
 import pixivpy_async as pixivpy
 import pydantic
 
 import atuyka.errors
-from atuyka import utility
+import atuyka.utility
 from atuyka.services import base
 
 from . import models
@@ -21,7 +23,7 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
     """Pixiv client."""
 
     # TODO: Encode with the token
-    CACHED_TOKENS: utility.Cache[str, dict[str, object]] = utility.Cache()
+    CACHED_TOKENS: atuyka.utility.Cache[str, dict[str, object]] = atuyka.utility.Cache()
 
     token: str | None
 
@@ -318,3 +320,22 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
     async def search_users(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search users."""
         raise NotImplementedError
+
+    @contextlib.asynccontextmanager
+    async def _proxy(
+        self,
+        url: str,
+        /,
+        headers: collections.abc.Mapping[str, str] | None = None,
+        **kwargs: object,
+    ) -> typing.AsyncIterator[atuyka.utility.ProxyEnteredContextType]:
+        """Proxy a request."""
+        # Copied from AppPixivAPI.download
+        headers = dict(headers or {})
+        headers["Referer"] = "https://app-api.pixiv.net/"
+
+        async with aiohttp.ClientSession(auto_decompress=False) as session:
+            async with session.get(url, **kwargs) as response:
+                headers = dict(response.headers)
+                headers["x-status-code"] = str(response.status)
+                yield (response.content.iter_any(), headers)

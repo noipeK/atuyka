@@ -187,7 +187,7 @@ class TwitterMediaEntity(pydantic.BaseModel):
                 original=attachment_urls["original"],
             )
 
-        warnings.warn(f"Unknown twitter media entity type: {self.type}")
+        warnings.warn(f"Unknown twitter media entity type: {self.type}", stacklevel=2)
         return base.Attachment(
             service="twitter",
             original=base.AttachmentURL(
@@ -423,7 +423,7 @@ class TwitterMedia(pydantic.BaseModel):
                 original=attachment_urls["original"],
             )
 
-        warnings.warn(f"Unknown twitter media type: {self.type}")
+        warnings.warn(f"Unknown twitter media type: {self.type}", stacklevel=2)
         return base.Attachment(
             service="twitter",
             original=base.AttachmentURL(

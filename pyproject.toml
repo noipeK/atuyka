@@ -36,6 +36,7 @@ line-length = 130
 # EM: String literal in exception
 # ERA: Commented-out code
 # FBT: Boolean in positional function type (duck-typing)
+# SLF: Private member access
 # TCH: Not using TYPE_CHECKING (ugly)
 # ANN10: Missing type annotation for self/cls (useless)
 # ANN401: Use of typing.Any (complicates)
@@ -58,6 +59,7 @@ ignore = [
   "EM",
   "ERA",
   "FBT",
+  "SLF",
   "TCH",
   "ANN10",
   "ANN401",

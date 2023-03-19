@@ -1,5 +1,6 @@
 """Twitter front-end API client."""
 import collections.abc
+import contextlib
 import os
 import re
 import typing
@@ -8,7 +9,7 @@ import aiohttp
 import pydantic
 
 import atuyka.errors
-from atuyka import utility
+import atuyka.utility
 from atuyka.services import base
 
 from . import models
@@ -37,7 +38,7 @@ class TwitterError(typing.TypedDict):
 class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
     """Twitter front-end API client."""
 
-    NAME_CACHE: utility.Cache[str, str] = utility.Cache()
+    NAME_CACHE: atuyka.utility.Cache[str, str] = atuyka.utility.Cache()
 
     auth_token: str | None
 
@@ -445,3 +446,17 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
     async def search_users(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search users."""
         raise NotImplementedError
+
+    @contextlib.asynccontextmanager
+    async def _proxy(
+        self,
+        url: str,
+        /,
+        **kwargs: object,
+    ) -> typing.AsyncIterator[atuyka.utility.ProxyEnteredContextType]:
+        """Download a file."""
+        async with aiohttp.ClientSession(auto_decompress=False) as session:
+            async with session.get(url, **kwargs) as response:
+                headers = dict(response.headers)
+                headers["x-status-code"] = str(response.status)
+                yield (response.content.iter_any(), headers)
