@@ -687,9 +687,9 @@ class Tweet(pydantic.BaseModel):
     """Details about the media in the tweet."""
     source: str
     """Which platform this tweet was made from."""
-    in_reply_to_status_id: object | None
+    in_reply_to_status_id: int | None
     """IDK."""
-    in_reply_to_status_id_str: object | None
+    in_reply_to_status_id_str: str | None
     """IDK."""
     in_reply_to_user_id: object | None
     """IDK."""
@@ -783,6 +783,46 @@ class Tweet(pydantic.BaseModel):
 
 
 # ====================
+
+
+class SearchMetadata(pydantic.BaseModel):
+    """Metadata about a search result."""
+
+    completed_in: float
+    """The number of seconds it took to complete the search."""
+    max_id: int
+    """The maximum ID of the tweets in the search result."""
+    max_id_str: str
+    """The maximum ID of the tweets in the search result as a string."""
+    next_results: str | None
+    """The URL to the next page of results."""
+    query: str
+    """The query used to search."""
+    refresh_url: str
+    """The URL to refresh the search."""
+    count: int
+    """The number of tweets in the search result."""
+    since_id: int
+    """The minimum ID of the tweets in the search result."""
+    since_id_str: str
+    """The minimum ID of the tweets in the search result as a string."""
+
+
+class SearchResult(pydantic.BaseModel):
+    """A search result."""
+
+    statuses: list[Tweet]
+    """The tweets in the search result."""
+    search_metadata: SearchMetadata
+    """Metadata about the search result."""
+
+    def to_universal(self) -> base.Page[base.Post]:
+        """Convert the search result to a universal search result."""
+        n = dict(max_id=self.search_metadata.max_id_str) if self.search_metadata.next_results else None
+        return base.Page(
+            items=[item.to_universal() for item in self.statuses],
+            next=n,
+        )
 
 
 class Cursor(pydantic.BaseModel):

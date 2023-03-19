@@ -101,6 +101,8 @@ class ServiceClientMeta(abc.ABCMeta):
         return client_cls(token)
 
 
+# TODO: Config
+# slug, urls, auth, id preference, proxy service, etc
 class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
     """Base service client."""
 

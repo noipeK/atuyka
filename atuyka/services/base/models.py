@@ -207,6 +207,9 @@ class Comment(pydantic.BaseModel):
     language: str | None = None
     """The comment language."""
 
+    liked: bool | None = None
+    """Whether the comment is liked by the authenticated user."""
+
 
 class Post(pydantic.BaseModel):
     """A post."""

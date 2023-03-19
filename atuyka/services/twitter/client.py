@@ -348,6 +348,32 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         data = await self.request_json_api("statuses/show.json", params=params)
         return pydantic.parse_obj_as(models.Tweet, data)
 
+    async def search_tweets(
+        self,
+        query: str,
+        *,
+        lang: str | None = None,
+        locale: str | None = None,
+        result_type: str | None = None,
+        count: int | None = None,
+        until: int | None = None,
+        since_id: int | None = None,
+        max_id: int | None = None,
+    ) -> models.SearchResult:
+        """Search for tweets."""
+        params = dict(
+            q=query,
+            lang=lang,
+            locale=locale,
+            result_type=result_type,
+            count=count,
+            until=until,
+            since_id=since_id,
+            max_id=max_id,
+        )
+        data = await self.request_json_api("search/tweets.json", params=params)
+        return pydantic.parse_obj_as(models.SearchResult, data)
+
     # ------------------------------------------------------------
     # UNIVERSAL:
 
@@ -425,7 +451,7 @@ class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
         **kwargs: object,
     ) -> typing.NoReturn:
         """Get comments."""
-        raise NotImplementedError
+        raise atuyka.errors.MissingEndpointError("twitter", "posts/comments")
 
     async def get_similar_posts(self, user: str | None, post: str, **kwargs: object) -> typing.NoReturn:
         """Get similar posts."""
