@@ -24,19 +24,6 @@ def get_filename(url: str) -> str:
     return url.split("/")[-1]
 
 
-class AtuykaService(pydantic.BaseModel):
-    """An Atuyka service."""
-
-    name: str
-    """The service name."""
-    url: str | None = None
-    """The service URL."""
-    icon: str | None = None
-    """The service icon URL."""
-    authorization: bool
-    """Whether the service requires authorization."""
-
-
 class Connection(pydantic.BaseModel):
     """A connection to a different service."""
 
@@ -84,7 +71,7 @@ class AttachmentURL(pydantic.BaseModel):
     alt_url: str | None = None
     """Link to the attachment on an alternative front-end of the service."""
 
-    @pydantic.root_validator()
+    @pydantic.root_validator()  # pyright: reportUnknownMemberType=false
     def __complete_values(cls, values: dict[str, typing.Any]) -> dict[str, typing.Any]:
         """Add the routed URL."""
         values["filename"] = values.get("filename") or get_filename(values["url"])
@@ -141,6 +128,8 @@ class User(pydantic.BaseModel):
 
     created_at: datetime.datetime | None = None
     """The user creation date."""
+    request_id: str
+    """ID used for requests. May be derived from the username."""
     id: str
     """The unique author ID."""
     name: str

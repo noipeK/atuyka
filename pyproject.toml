@@ -46,6 +46,7 @@ line-length = 130
 # C408: Unnecessary dict call (ugly)
 # D105: Missing docstring in magic method (useless)
 # N805: First argument is not self (pydantic)
+# PGH003: Specific rules when ignoring type issues
 # PLR0913: Too many arguments
 # PLR2004: constant value in comparison (asserts)
 # PLW2901: Redefining for-loop variable
@@ -69,6 +70,7 @@ ignore = [
   "C408",
   "D105",
   "N805",
+  "PGH003",
   "PLR0913",
   "PLR2004",
   "PLW2901",

@@ -19,7 +19,7 @@ from . import models
 __all__ = ["Pixiv"]
 
 
-class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
+class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.moe", auth=True):
     """Pixiv client."""
 
     # TODO: Encode with the token
@@ -207,7 +207,11 @@ class Pixiv(base.ServiceClient, service="pixiv", url="pixiv.net", auth=True):
             filter="for_ios",
             viewed=list(viewed) if viewed else None,
         )
-        id_params: dict[str, str] = self.api.set_params(viewed=list(seed_illust_ids) if seed_illust_ids else None)
+        # NOTE: pyright bug, unknown return type requires cast
+        id_params = typing.cast(
+            "dict[str, str]",
+            self.api.set_params(viewed=list(seed_illust_ids) if seed_illust_ids else None),
+        )
         for key, param in id_params.items():
             params[key.replace("viewed", "seed_illust_ids")] = param
 

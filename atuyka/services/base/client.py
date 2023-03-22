@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import abc
 import collections.abc
+import dataclasses
 import importlib
 import importlib.machinery
 import importlib.util
@@ -47,42 +48,84 @@ def load_services(
     return imported
 
 
+@dataclasses.dataclass
+class ServiceClientConfig:
+    """Configuration for a service client."""
+
+    slug: str
+    """Service slug."""
+    name: str
+    """Service name."""
+    url: str | None = None
+    """Service URL."""
+    alt_url: str | None = None
+    """Alternative frontend URL."""
+    requires_authorization: bool = False
+    """Whether the service requires authorization."""
+    proxy_service: str | None = None
+    """Proxy service used for the API."""
+
+    @property
+    def detailed_name(self) -> str:
+        """Get detailed name."""
+        if self.proxy_service:
+            return f"{self.name} ({self.proxy_service})"
+
+        return self.name
+
+
 class ServiceClientMeta(abc.ABCMeta):
     """Metaclass for service clients."""
 
-    service_name: str | None = None
-    url: str | None = None
-    requires_authorization: bool = True
+    config: ServiceClientConfig
 
-    def __init__(
+    def __init__(  # pyright: reportInconsistentConstructor=false
         cls,
-        name: str,
+        clsname: str,
         bases: tuple[type, ...],
         namespace: dict[str, object],
         *,
-        service: str | None = None,
+        slug: str | None = None,
+        name: str | None = None,
         url: str | None = None,
+        alt_url: str | None = None,
         auth: bool = False,
+        proxy: str | None = None,
         **kwargs: object,
     ) -> None:
-        cls.service_name = service
-        cls.url = url
-        cls.requires_authorization = auth
-        super().__init__(name, bases, namespace)
+        if slug:
+            cls.config = ServiceClientConfig(
+                slug=slug,
+                name=name or slug.replace("_", " ").title(),
+                url=url,
+                alt_url=alt_url,
+                requires_authorization=auth,
+                proxy_service=proxy,
+            )
+
+        super().__init__(clsname, bases, namespace)
+
+    @property
+    def _is_available(cls) -> bool:
+        return hasattr(cls, "config")
+
+    def __get_subclasses__(cls, load: bool = False, available: bool = True) -> list[type[ServiceClient]]:
+        """Get subclasses of this client class."""
+        subclasses = [c for c in cls.__subclasses__() if c._is_available or not available]
+        if not subclasses and load:
+            load_services()
+            return cls.__get_subclasses__(available=available)
+
+        return subclasses  # pyright: ignore # metaclass
 
     @property
     def available_services(cls) -> dict[str, type[ServiceClient]]:
         """Get subclasses."""
-        services = {c.service_name: c for c in cls.__subclasses__() if c.service_name is not None}
-        if services:
-            return services  # pyright: ignore # metaclass
+        services = {c.config.slug: c for c in cls.__get_subclasses__()}
+        if not services:
+            raise RuntimeError("No services loaded.")
 
-        load_services()
-        services = {c.service_name: c for c in cls.__subclasses__() if c.service_name is not None}
-        if services:
-            return services  # pyright: ignore # metaclass
-
-        raise RuntimeError("No services loaded.")
+        return services
 
     def create(
         cls: type[ServiceClient],  # pyright: ignore # metaclass
@@ -95,14 +138,12 @@ class ServiceClientMeta(abc.ABCMeta):
         if client_cls is None:
             raise atuyka.errors.InvalidServiceError(service, list(cls.available_services))
 
-        if client_cls.requires_authorization and token is None:
+        if client_cls.config.requires_authorization and token is None:
             raise atuyka.errors.MissingTokenError(service)
 
         return client_cls(token)
 
 
-# TODO: Config
-# slug, urls, auth, id preference, proxy service, etc
 class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
     """Base service client."""
 

@@ -635,6 +635,7 @@ class TwitterUser(pydantic.BaseModel):
                 ((self.id >> 22) + 1288834974657) / 1000,
                 tz=datetime.timezone.utc,
             ),
+            request_id=self.screen_name,
             id=self.id_str,
             name=self.name,
             unique_name=self.screen_name,

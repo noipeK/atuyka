@@ -146,7 +146,7 @@ class PixivUser(pydantic.BaseModel):
         """Convert to a universal user."""
         return base.User(
             service="pixiv",
-            created_at=None,
+            request_id=str(self.id),
             id=str(self.id),
             name=self.name,
             unique_name=self.account,
@@ -390,17 +390,15 @@ class PixivUserDetails(pydantic.BaseModel):
                 continue
 
             for service in base_client.ServiceClient.available_services.values():
-                if not service.url:
-                    continue
-
-                if service.url in mention.url:
-                    connection = base.Connection(service=service.service_name, url=mention.url)
+                if service.config.url and service.config.url in mention.url:
+                    connection = base.Connection(service=service.config.slug, url=mention.url)
                     connections.append(connection)
                     break
 
         return base.User(
             service="pixiv",
             id=str(self.user.id),
+            request_id=str(self.user.id),
             name=self.user.name,
             unique_name=self.user.account,
             bio=self.user.comment,
@@ -408,7 +406,7 @@ class PixivUserDetails(pydantic.BaseModel):
             alt_url=f"https://www.pixiv.moe/user/{self.user.id}",
             avatar=self.user.profile_image_urls.to_universal(),
             banner=self.profile.background_image_to_universal(),
-            # actually following? The heck pixiv!?
+            # not followers but how many they're following? The heck pixiv!?
             # followers=self.profile.total_follow_users,
             connections=connections,
             mentions=mentions,
@@ -451,7 +449,11 @@ class PixivPaginatedResource(pydantic.BaseModel):
 
         # pixiv uses php query arrays (e.g. ?a[0]=1&a[1]=2)
         # we use comma separated values (e.g. ?a=1,2)
-        raw_query: dict[str, str | list[str]] = pixivpy_utils.parse_qs(self.next_url)  # pyright: ignore
+        # NOTE: pyright bug, unknown return type requires cast
+        raw_query = typing.cast(
+            "dict[str, str | list[str]]",
+            pixivpy_utils.parse_qs(self.next_url),  # pyright: reportUnknownMemberType=false
+        )
 
         query: dict[str, str] = {}
         for key in keys:

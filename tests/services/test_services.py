@@ -24,9 +24,7 @@ async def get_service(service: str) -> typing.AsyncIterator[atuyka.services.Serv
 async def test_get_user(service: str, user: str) -> None:
     async with get_service(service) as client:
         result = await client.get_user(user)
-        # TODO: Respect config
-        assert result.unique_name
-        assert result.unique_name.lower() == user
+        assert result.request_id.lower() == user
 
 
 @pytest.mark.asyncio()

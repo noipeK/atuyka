@@ -35,7 +35,7 @@ class TwitterError(typing.TypedDict):
     message: str
 
 
-class Twitter(base.ServiceClient, service="twitter", url="twitter.com"):
+class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="nitter.net"):
     """Twitter front-end API client."""
 
     NAME_CACHE: atuyka.utility.Cache[str, str] = atuyka.utility.Cache()

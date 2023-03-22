@@ -68,8 +68,7 @@ async def dependency_user_id(
     if user and user != "me" and user != "0":
         return user
 
-    service = client.__class__.service_name or ""
-    raise atuyka.errors.MissingUserIDError(service, client.my_user_id)
+    raise atuyka.errors.MissingUserIDError(client.__class__.config.slug, client.my_user_id)
 
 
 async def dependency_post_id(post: str = params.Path(description="Post identifier.")) -> str:
@@ -78,15 +77,9 @@ async def dependency_post_id(post: str = params.Path(description="Post identifie
 
 
 @router.get("/services")
-async def get_services() -> list[atuyka.services.models.AtuykaService]:
+async def get_services() -> list[atuyka.services.base.client.ServiceClientConfig]:
     """Get available services."""
-    return [
-        atuyka.services.models.AtuykaService(
-            name=service.service_name or service.__name__,
-            authorization=service.requires_authorization,
-        )
-        for service in atuyka.services.ServiceClient.available_services.values()
-    ]
+    return [c.config for c in atuyka.services.ServiceClient.__get_subclasses__()]
 
 
 @router.get("/users/me/id")
