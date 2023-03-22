@@ -434,13 +434,23 @@ class PixivUserPreview(pydantic.BaseModel):
         return self.user.to_universal()
 
 
+KEYS = [
+    "offset",
+    "seed_illust_ids",
+    "max_bookmark_id",
+    "viewed",
+    "min_bookmark_id_for_recent_illust",
+    "max_bookmark_id_for_recommend",
+]
+
+
 class PixivPaginatedResource(pydantic.BaseModel):
     """Pixiv paginated resource."""
 
     next_url: str | None
     """The next page URL."""
 
-    def get_next_query(self, key: str | list[str] = "offset") -> collections.abc.Mapping[str, str] | None:
+    def get_next_query(self, key: str | list[str] = KEYS) -> collections.abc.Mapping[str, str] | None:
         """Convert the resource to a universal paginated resource."""
         if self.next_url is None:
             return None
@@ -479,7 +489,7 @@ class PixivPaginatedIllusts(PixivPaginatedResource):
         """Convert the resource to a universal paginated resource."""
         return base.Page(
             items=[illust.to_universal() for illust in self.illusts],
-            next=self.get_next_query(["offset", "seed_illust_ids", "viewed"]),
+            next=self.get_next_query(),
         )
 
 
@@ -495,7 +505,7 @@ class PixivPaginatedBookmarks(PixivPaginatedResource):
         """Convert the resource to a universal paginated resource."""
         return base.Page(
             items=[illust.to_universal() for illust in self.illusts],
-            next=self.get_next_query("max_bookmark_id"),
+            next=self.get_next_query(),
         )
 
 

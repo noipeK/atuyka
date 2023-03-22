@@ -374,6 +374,22 @@ class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="ni
         data = await self.request_json_api("search/tweets.json", params=params)
         return pydantic.parse_obj_as(models.SearchResult, data)
 
+    async def get_home_timeline(
+        self,
+        *,
+        count: int | None = None,
+        since_id: int | None = None,
+        max_id: int | None = None,
+    ) -> collections.abc.Sequence[models.Tweet]:
+        """Get the home timeline."""
+        params = dict(
+            count=count,
+            since_id=since_id,
+            max_id=max_id,
+        )
+        data = await self.request_json_api("statuses/home_timeline.json", params=params)
+        return pydantic.parse_obj_as(collections.abc.Sequence[models.Tweet], data)
+
     # ------------------------------------------------------------
     # UNIVERSAL:
 
@@ -395,7 +411,7 @@ class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="ni
         tweets = await self.get_favorites(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
-        page = base.models.Page(items=posts, next=dict(since_id=str(tweets[-1].id)))
+        page = base.models.Page(items=posts, next=dict(max_id=str(tweets[-1].id)))
         return page
 
     async def get_following(
@@ -435,7 +451,7 @@ class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="ni
         tweets = await self.get_user_tweets(user, since_id=since_id, max_id=max_id, count=count)
         posts = [tweet.to_universal() for tweet in tweets]
 
-        page = base.models.Page(items=posts, next=dict(since_id=str(tweets[-1].id)))
+        page = base.models.Page(items=posts, next=dict(max_id=str(tweets[-1].id)))
         return page
 
     async def get_post(self, user: str | None, post: str, **kwargs: object) -> base.models.Post:
@@ -455,15 +471,20 @@ class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="ni
 
     async def get_similar_posts(self, user: str | None, post: str, **kwargs: object) -> typing.NoReturn:
         """Get similar posts."""
+        # similar users: twitter.com/i/api/graphql/utMWC7sB1TkDlOuek2EimA/ConnectTabTimeline
         raise atuyka.errors.MissingEndpointError("twitter", "posts/similar")
 
-    async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_following_feed(self, **kwargs: object) -> base.models.Page[base.models.Post]:
         """Get posts made by followed users."""
-        raise NotImplementedError
+        tweets = await self.get_home_timeline()
+        posts = [tweet.to_universal() for tweet in tweets]
 
-    async def get_recommended_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+        page = base.models.Page(items=posts, next=dict(max_id=str(tweets[-1].id)))
+        return page
+
+    async def get_recommended_feed(self, **kwargs: object) -> typing.NoReturn:
         """Get recommended posts."""
-        raise NotImplementedError
+        raise atuyka.errors.MissingEndpointError("twitter", "feed/recommended")
 
     async def search_posts(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search posts."""

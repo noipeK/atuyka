@@ -24,8 +24,8 @@ T = typing.TypeVar("T")
 # /users/.../posts/...
 # /users/.../posts/.../comments
 # /users/.../posts/.../similar
-# /feed/following ~ /user/.../feed/following
-# /feed/recommended ~ /user/.../feed/recommended
+# /feed/following
+# /feed/recommended
 # /search/posts?q
 # /search/users?q
 

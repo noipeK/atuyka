@@ -147,7 +147,6 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
         self,
         user: int | None = None,
         *,
-        restrict: str = "public",
         offset: int | None = None,
     ) -> models.PixivPaginatedUserPreviews:
         """Get user followers."""
@@ -168,7 +167,6 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
         """Get user illusts."""
         data = await self.api.user_illusts(  # pyright: reportUnknownVariableType=false
             user or self.user_id,
-            type="illust",
             offset=offset,  # pyright: ignore
         )
 
@@ -218,6 +216,49 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
         data = await self.api.requests_(method=method, url=url, params=params)
         return pydantic.parse_obj_as(models.PixivPaginatedIllusts, data)
 
+    async def get_following_illusts(
+        self,
+        *,
+        restrict: str = "public",
+        offset: int | None = None,
+    ) -> models.PixivPaginatedIllusts:
+        """Get following illusts."""
+        data = await self.api.illust_follow(
+            restrict=restrict,  # pyright: ignore
+            offset=offset,  # pyright: ignore
+        )
+        return pydantic.parse_obj_as(models.PixivPaginatedIllusts, data)
+
+    async def get_recommended_illusts(
+        self,
+        *,
+        min_bookmark_id_for_recent_illust: int | None = None,
+        max_bookmark_id_for_recommend: int | None = None,
+        offset: int | None = None,
+    ) -> models.PixivPaginatedIllusts:
+        """Get recommended illusts."""
+        data = await self.api.illust_recommended(
+            min_bookmark_id_for_recent_illust=min_bookmark_id_for_recent_illust,  # pyright: ignore
+            max_bookmark_id_for_recommend=max_bookmark_id_for_recommend,  # pyright: ignore
+            offset=offset,  # pyright: ignore
+        )
+        return pydantic.parse_obj_as(models.PixivPaginatedIllusts, data)
+
+    async def get_ranking_illusts(
+        self,
+        mode: str = "day",
+        date: str | None = None,
+        *,
+        offset: int | None = None,
+    ) -> models.PixivPaginatedIllusts:
+        """Get ranking illusts."""
+        data = await self.api.illust_ranking(
+            mode=mode,
+            date=date,  # pyright: ignore
+            offset=offset,  # pyright: ignore
+        )
+        return pydantic.parse_obj_as(models.PixivPaginatedIllusts, data)
+
     # ------------------------------------------------------------
     # UNIVERSAL:
 
@@ -253,12 +294,11 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
         self,
         user: str | None = None,
         *,
-        restrict: str = "public",
         offset: int | None = None,
         **kwargs: object,
     ) -> base.models.Page[base.models.User]:
         """Get followers."""
-        data = await self.get_user_followers(self._parse_user(user), restrict=restrict, offset=offset)
+        data = await self.get_user_followers(self._parse_user(user), offset=offset)
         return data.to_universal()
 
     async def get_posts(
@@ -309,13 +349,32 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
         )
         return data.to_universal()
 
-    async def get_following_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_following_feed(
+        self,
+        *,
+        restrict: str = "public",
+        offset: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.Post]:
         """Get posts made by followed users."""
-        raise NotImplementedError
+        data = await self.get_following_illusts(restrict=restrict, offset=offset)
+        return data.to_universal()
 
-    async def get_recommended_feed(self, user: str | None = ..., **kwargs: object) -> typing.NoReturn:
+    async def get_recommended_feed(
+        self,
+        *,
+        min_bookmark_id_for_recent_illust: int | None = None,
+        max_bookmark_id_for_recommend: int | None = None,
+        offset: int | None = None,
+        **kwargs: object,
+    ) -> base.models.Page[base.models.Post]:
         """Get recommended posts."""
-        raise NotImplementedError
+        data = await self.get_recommended_illusts(
+            min_bookmark_id_for_recent_illust=min_bookmark_id_for_recent_illust,
+            max_bookmark_id_for_recommend=max_bookmark_id_for_recommend,
+            offset=offset,
+        )
+        return data.to_universal()
 
     async def search_posts(self, query: str | None = ..., **kwargs: object) -> typing.NoReturn:
         """Search posts."""

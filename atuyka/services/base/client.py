@@ -212,11 +212,11 @@ class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
         """Get similar posts."""
 
     @abc.abstractmethod
-    async def get_following_feed(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
+    async def get_following_feed(self, **kwargs: object) -> models.Page[models.Post]:
         """Get posts made by followed users."""
 
     @abc.abstractmethod
-    async def get_recommended_feed(self, user: str | None = ..., /, **kwargs: object) -> models.Page[models.Post]:
+    async def get_recommended_feed(self, **kwargs: object) -> models.Page[models.Post]:
         """Get recommended posts."""
 
     @abc.abstractmethod
