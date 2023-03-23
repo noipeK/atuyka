@@ -8,7 +8,7 @@ setup(
     version="0.0.1",
     description="Sea string.",
     url="https://github.com/noipeK/atuyka",
-    packages=find_packages(exclude=["tests.*"]),
+    packages=find_packages(include=["atuyka", "atuyka.*"]),
     include_package_data=True,
     package_data={"atuyka": ["py.typed"]},
     install_requires=["aiohttp", "pydantic", "fastapi"],
