@@ -227,6 +227,33 @@ async def get_similar_posts_alt(
     return await client.get_similar_posts(None, post, **request.query_params)
 
 
+@router.get("/find", status_code=302)
+async def find_resource(
+    response: starlette.responses.Response,
+    url: str = fastapi.Query(..., description="URL to find"),
+) -> atuyka.services.models.Connection:
+    """Find a resource.
+
+    Returns parsed details in the body and redirects to the resource.
+    """
+    connection = atuyka.services.ServiceClient.parse_connection_url(url)
+    if not connection:
+        raise atuyka.errors.InvalidResourceError("", url, "Unknown resource type")
+
+    if connection.post and connection.user:
+        redirect_url = router.url_path_for("get_post", user=connection.user, post=connection.post)
+    elif connection.post:
+        redirect_url = router.url_path_for("get_post_alt", post=connection.post)
+    elif connection.user:
+        redirect_url = router.url_path_for("get_user", user=connection.user)
+    else:
+        raise atuyka.errors.InvalidResourceError("", url, "Unknown resource type")
+
+    response.headers["Location"] = str(redirect_url) + "?service=" + connection.service
+
+    return connection
+
+
 PROXY_HEADERS = (
     "x-status-code",
     "accept-ranges",

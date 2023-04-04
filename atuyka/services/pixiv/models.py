@@ -8,7 +8,6 @@ import pydantic
 import pydantic.generics
 from pixivpy_async.utils import Utils as pixivpy_utils  # noqa: N813 # pyright: ignore[reportUnknownVariableType]
 
-from atuyka.services.base import client as base_client
 from atuyka.services.base import models as base
 
 T = typing.TypeVar("T")
@@ -268,6 +267,15 @@ class PixivIllust(pydantic.BaseModel):
         else:
             urls = [self.image_urls]
 
+        mentions: list[str] = []
+        caption = re.sub(r"<br\s+?\/>", "\n", self.caption, flags=re.DOTALL)
+        caption = re.sub(
+            r'<a.*?href="(.+?)".*?>(.+?)<\/a>',
+            lambda m: mentions.append(m[1]) or m[1],
+            caption,
+            flags=re.DOTALL,
+        )
+
         return base.Post(
             service="pixiv",
             created_at=self.create_date,
@@ -275,15 +283,14 @@ class PixivIllust(pydantic.BaseModel):
             url=f"https://www.pixiv.net/artworks/{self.id}",
             alt_url=f"https://www.pixiv.moe/illust/{self.id}",
             title=self.title,
-            description=self.caption,
+            description=caption,
             views=self.total_view,
             likes=self.total_bookmarks,
             attachments=[url.to_universal() for url in urls],
             tags=[base.Tag(service="pixiv", name=tag.name, localized_name=tag.translated_name) for tag in self.tags],
             author=self.user.to_universal(),
             connections=[],  # TODO: Detect connections from mentions
-            # TODO: Contained in <a href=""> tags, consider parsing the html
-            mentions=[base.Mention(url=url) for url in re.findall(r"https?://[^\s]+", self.title + " " + self.caption)],
+            mentions=[base.Mention(url=url) for url in mentions],
             nsfw=self.sanity_level > 4,  # TODO: Figure this out precisely
             liked=self.is_bookmarked,
         )
@@ -373,7 +380,7 @@ class PixivUserDetails(pydantic.BaseModel):
                 base.Connection(
                     service="twitter",
                     url=self.profile.twitter_url,
-                    user_id=self.profile.twitter_account,
+                    user=self.profile.twitter_account,
                 ),
             )
             mentions.append(base.Mention(url=self.profile.twitter_url))
@@ -383,17 +390,6 @@ class PixivUserDetails(pydantic.BaseModel):
         if self.user.comment:
             for url in re.findall(r"https?://[^\s]+", self.user.comment):
                 mentions.append(base.Mention(url=url))
-
-        # TODO: Parse automatically
-        for mention in mentions:
-            if any(part in mention.url for part in ("pixiv.net", "twitter.com")):
-                continue
-
-            for service in base_client.ServiceClient.available_services.values():
-                if service.config.url and service.config.url in mention.url:
-                    connection = base.Connection(service=service.config.slug, url=mention.url)
-                    connections.append(connection)
-                    break
 
         return base.User(
             service="pixiv",

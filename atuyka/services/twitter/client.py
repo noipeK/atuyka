@@ -507,3 +507,16 @@ class Twitter(base.ServiceClient, slug="twitter", url="twitter.com", alt_url="ni
                 headers = dict(response.headers)
                 headers["x-status-code"] = str(response.status)
                 yield (response.content.iter_any(), headers)
+
+    @classmethod
+    def parse_connection_url(cls, url: str) -> base.models.Connection | None:
+        """Parse connection URL."""
+        match = re.match(r"https?://twitter.com/([^/]+)$", url)
+        if match:
+            return base.models.Connection(service="twitter", url=url, user=match[1])
+
+        match = re.match(r"https?://twitter.com/([^/]+)/status/(\d+)$", url)
+        if match:
+            return base.models.Connection(service="twitter", url=url, user=match[1], post=match[2])
+
+        return None

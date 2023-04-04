@@ -121,7 +121,7 @@ class ServiceClientMeta(abc.ABCMeta):
     @property
     def available_services(cls) -> dict[str, type[ServiceClient]]:
         """Get subclasses."""
-        services = {c.config.slug: c for c in cls.__get_subclasses__()}
+        services = {c.config.slug: c for c in cls.__get_subclasses__(load=True)}
         if not services:
             raise RuntimeError("No services loaded.")
 
@@ -242,3 +242,36 @@ class ServiceClient(abc.ABC, metaclass=ServiceClientMeta):
         """Download a url."""
         async with self.proxy(url, **kwargs) as stream:
             return await stream.read()
+
+    @classmethod
+    def parse_connection_url(cls, url: str) -> models.Connection | None:
+        """Parse a connection url."""
+        if cls != ServiceClient:
+            return None
+
+        for client in cls.__get_subclasses__():
+            connection = client.parse_connection_url(url)
+            if connection is not None:
+                return connection
+
+        return None
+
+    @classmethod
+    async def get_resource(cls, url: str) -> models.User | models.Post | None:
+        """Get a resource from a url.
+
+        For more fine-grained use, use `parse_connection_url`.
+        """
+        connection = cls.parse_connection_url(url)
+        if not connection or not connection.service:
+            return None
+
+        client = cls.create(connection.service)
+
+        if connection.post:
+            return await client.get_post(connection.user, connection.post)
+
+        if connection.user:
+            return await client.get_user(connection.user)
+
+        return None

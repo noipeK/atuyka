@@ -2,6 +2,7 @@
 import asyncio
 import collections.abc
 import contextlib
+import re
 import typing
 
 import aiohttp
@@ -402,3 +403,16 @@ class Pixiv(base.ServiceClient, slug="pixiv", url="pixiv.net", alt_url="pixiv.mo
                 headers = dict(response.headers)
                 headers["x-status-code"] = str(response.status)
                 yield (response.content.iter_any(), headers)
+
+    @classmethod
+    def parse_connection_url(cls, url: str) -> base.models.Connection | None:
+        """Parse connection URL."""
+        match = re.match(r"https?://(?:www\.)?pixiv\.net/(?:en/)?(?:users|members)/(\d+)", url)
+        if match:
+            return base.models.Connection(service="pixiv", url=url, user=match[1])
+
+        match = re.match(r"https?://(?:www\.)?pixiv\.net/(?:en/)?(?:artworks|illustrations)/(\d+)", url)
+        if match:
+            return base.models.Connection(service="pixiv", url=url, post=match[1])
+
+        return None

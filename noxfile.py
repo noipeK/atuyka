@@ -157,3 +157,9 @@ def prettier(session: nox.Session) -> None:
         session.skip("Prettier not installed")
 
     session.run("prettier", "-w", "*.md", "docs/*.md", "docs/**/*.md", "*.yml", "*.toml", external=True)
+
+
+@nox.session(name="dev-api", venv_backend="none")
+def run_api_server(session: nox.Session) -> None:
+    """Run the server."""
+    session.run("python", "-m", "uvicorn", "atuyka.api.__main__:app", "--reload", *verbose_args())

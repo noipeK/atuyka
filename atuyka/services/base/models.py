@@ -8,6 +8,8 @@ import urllib.parse
 import pydantic
 import pydantic.generics
 
+from . import client
+
 T = typing.TypeVar("T")
 
 
@@ -27,15 +29,15 @@ def get_filename(url: str) -> str:
 class Connection(pydantic.BaseModel):
     """A connection to a different service."""
 
-    service: str | None = None
+    service: str
     """The service name."""
 
     url: str
     """The service URL."""
-    post_id: str | None = None
-    """The target post ID."""
-    user_id: str | None = None
-    """The target user ID."""
+    user: str | None = None
+    """The target user url component."""
+    post: str | None = None
+    """The target post url component."""
 
 
 class Mention(pydantic.BaseModel):
@@ -43,7 +45,16 @@ class Mention(pydantic.BaseModel):
 
     url: str
     """The URL of the mentioned resource."""
-    # TODO: Analyze the URL
+
+    connection: Connection | None = None
+    """The connection to the mentioned resource."""
+
+    @pydantic.root_validator()
+    def __set_connection(cls, values: dict[str, typing.Any]) -> dict[str, typing.Any]:
+        """Set the connection."""
+        values["connection"] = client.ServiceClient.parse_connection_url(url=values["url"])
+
+        return values
 
 
 class AttachmentURL(pydantic.BaseModel):
