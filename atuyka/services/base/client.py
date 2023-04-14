@@ -7,6 +7,7 @@ import dataclasses
 import importlib
 import importlib.machinery
 import importlib.util
+import inspect
 import pkgutil
 import types
 import typing
@@ -27,6 +28,8 @@ T = typing.TypeVar("T")
 def load_services(
     include: collections.abc.Collection[str] | None = None,
     exclude: collections.abc.Collection[str] | None = None,
+    *,
+    package: str = "atuyka.services",
 ) -> typing.Sequence[types.ModuleType]:
     """Load services by importing them."""
     path = (__file__.rsplit("/", 2)[0],)
@@ -39,13 +42,79 @@ def load_services(
             continue
 
         try:
-            module = importlib.import_module("atuyka.services." + module_name)
+            module = importlib.import_module(package + "." + module_name)
         except BaseException as e:  # noqa: BLE001  # bare except
             warnings.warn(f"Failed to import {module_name}: {e}", stacklevel=2)
         else:
             imported.append(module)
 
     return imported
+
+
+@dataclasses.dataclass
+class ServiceMethodParameter:
+    """Optional parameter for a service method."""
+
+    name: str
+    """Name of the parameter."""
+    description: str | None = None
+    """Description of the parameter."""
+    type: str = "string"
+    """Type of the parameter."""
+
+    def to_schema(self, *, required: bool = False) -> collections.abc.Mapping[str, object]:
+        """Convert to a schema."""
+        return {
+            "name": self.name,
+            "in": "query",
+            "description": self.description or "",
+            "required": required,
+            "schema": {
+                # TODO: Support more types
+                "type": self.type,
+            },
+        }
+
+
+@dataclasses.dataclass
+class ServiceMethod:
+    """Method for a service."""
+
+    name: str
+    """Name of the method."""
+    description: str
+    """Description of the method."""
+    parameters: collections.abc.Sequence[ServiceMethodParameter]
+    """Optional parameters for the method."""
+
+    @classmethod
+    def from_method(cls, method: typing.Callable[..., typing.Awaitable[object]]) -> typing_extensions.Self:
+        """Create a service method dataclass from a method."""
+        parameters: list[ServiceMethodParameter] = []
+
+        # TODO: Docstring parsing for more details
+        for param in inspect.signature(method, eval_str=True).parameters.values():
+            if param.kind is param.KEYWORD_ONLY:
+                parameters.append(ServiceMethodParameter(param.name, type=param.annotation))
+
+        return cls(
+            name=method.__name__.replace("get_", "", 1),
+            description=method.__doc__ or "",
+            parameters=parameters,
+        )
+
+    def to_schema(self) -> collections.abc.Mapping[str, object]:
+        """Convert to a schema."""
+        parameters = [
+            ServiceMethodParameter("service", "Target service slug").to_schema(required=True),
+            ServiceMethodParameter("token", "Token for the chosen service").to_schema(),
+        ]
+        parameters += [param.to_schema() for param in self.parameters]
+        return {
+            "name": self.name,
+            "description": self.description,
+            "parameters": parameters,
+        }
 
 
 @dataclasses.dataclass
@@ -64,6 +133,7 @@ class ServiceClientConfig:
     """Whether the service requires authorization."""
     proxy_service: str | None = None
     """Proxy service used for the API."""
+    methods: dict[str, ServiceMethod] = dataclasses.field(default_factory=dict, repr=False)
 
     @property
     def detailed_name(self) -> str:
@@ -93,17 +163,29 @@ class ServiceClientMeta(abc.ABCMeta):
         proxy: str | None = None,
         **kwargs: object,
     ) -> None:
-        if slug:
-            cls.config = ServiceClientConfig(
-                slug=slug,
-                name=name or slug.replace("_", " ").title(),
-                url=url,
-                alt_url=alt_url,
-                requires_authorization=auth,
-                proxy_service=proxy,
-            )
-
         super().__init__(clsname, bases, namespace)
+
+        if not slug:
+            return
+
+        cls.config = ServiceClientConfig(
+            slug=slug,
+            name=name or slug.replace("_", " ").title(),
+            url=url,
+            alt_url=alt_url,
+            requires_authorization=auth,
+            proxy_service=proxy,
+        )
+
+        for name in dir(cls):
+            attr = getattr(cls, name, None)
+            if not attr or not callable(attr):
+                continue
+
+            if name not in ServiceClient.__abstractmethods__:
+                continue
+
+            cls.config.methods[name] = ServiceMethod.from_method(attr)
 
     @property
     def _is_available(cls) -> bool:
@@ -126,6 +208,11 @@ class ServiceClientMeta(abc.ABCMeta):
             raise RuntimeError("No services loaded.")
 
         return services
+
+    @property
+    def schemas(cls) -> collections.abc.Sequence[collections.abc.Mapping[str, object]]:
+        """Get schemas for this client."""
+        return [method.to_schema() for method in cls.config.methods.values()]
 
     def create(
         cls: type[ServiceClient],  # pyright: ignore # metaclass

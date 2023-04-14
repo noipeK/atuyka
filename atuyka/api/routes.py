@@ -4,6 +4,7 @@ import logging
 import typing
 
 import fastapi
+import fastapi.dependencies.models
 import fastapi.param_functions as params
 import fastapi.params
 import starlette.requests
@@ -33,6 +34,20 @@ T = typing.TypeVar("T")
 router: fastapi.APIRouter = fastapi.APIRouter(tags=["services"])
 
 
+class SpecialRequest(atuyka.errors.AtuykaError):
+    """Special request that has a client."""
+
+    client: atuyka.services.ServiceClient
+
+    def __init__(self, client: atuyka.services.ServiceClient) -> None:
+        self.client = client
+        super().__init__(client.__class__.config.slug, "Special request has tried to be used.")
+
+
+class OptionsRequest(SpecialRequest):
+    """OPTIONS request error."""
+
+
 async def dependency_client(
     request: starlette.requests.Request,
     response: starlette.responses.Response,
@@ -53,6 +68,9 @@ async def dependency_client(
 
     if client.my_user_id:
         response.set_cookie(f"{service}_id", client.my_user_id)
+
+    if request.method == "OPTIONS":
+        raise OptionsRequest(client)
 
     try:
         yield client
@@ -80,6 +98,12 @@ async def dependency_post_id(post: str = params.Path(description="Post identifie
 async def get_services() -> list[atuyka.services.base.client.ServiceClientConfig]:
     """Get available services."""
     return [c.config for c in atuyka.services.ServiceClient.__get_subclasses__()]
+
+
+@router.get("/services/{service}")
+async def get_service(service: str) -> atuyka.services.base.client.ServiceClientConfig:
+    """Get a service."""
+    return atuyka.services.ServiceClient.create(service).__class__.config
 
 
 @router.get("/users/me/id")
@@ -290,6 +314,42 @@ async def proxy(
     )
 
 
+@router.options("/{path:path}")
+def options(
+    request: starlette.requests.Request,
+    *,
+    service: str | None = fastapi.Query(None, description="Service to use"),
+    path: object = fastapi.Path(...),
+) -> starlette.responses.Response:
+    """Get options for an endpoint."""
+    if not service:
+        return starlette.responses.Response(status_code=204, headers={"Allow": "GET, OPTIONS"})
+
+    client_cls = atuyka.services.ServiceClient.available_services.get(service)
+    if client_cls is None:
+        raise atuyka.errors.InvalidServiceError(service, list(atuyka.services.ServiceClient.available_services))
+
+    if isinstance(path, str):
+        for route in router.routes:
+            if not isinstance(route, fastapi.routing.APIRoute):
+                continue
+            if not _has_dependency(route.dependant, "client"):
+                continue
+            if not route.path_regex.match("/" + path):  # pyright: reportUnknownMemberType=false
+                continue
+            break
+        else:
+            return starlette.responses.Response(status_code=204, headers={"Allow": "GET, OPTIONS"})
+    else:
+        route = request.scope["route"]
+
+    method_info = client_cls.config.methods.get(route.name)
+    if method_info is None:
+        return starlette.responses.Response(status_code=204, headers={"Allow": "GET, OPTIONS"})
+
+    return starlette.responses.JSONResponse(method_info.to_schema(), headers={"Allow": "GET, OPTIONS"})
+
+
 def exception_handler(
     request: starlette.requests.Request,
     exc: atuyka.errors.AtuykaError,
@@ -324,6 +384,8 @@ def exception_handler(
             status_code = 401
         case atuyka.errors.ServiceError:
             status_code = 400
+        case OptionsRequest(client=client):
+            return options(request, service=client.__class__.config.slug)
         case _:
             status_code = 500
             error_type = "Internal"
@@ -333,6 +395,21 @@ def exception_handler(
         status_code=status_code,
         content={"error": exc.message, "error_type": error_type, "service": exc.service, **data},
     )
+
+
+def _has_dependency(route: fastapi.dependencies.models.Dependant, name: str, *, level: int | None = None) -> bool:
+    """Check if a route has a dependency."""
+    if level == 0:
+        return False
+
+    for dependency in route.dependencies:
+        if dependency.name == name:
+            return True
+
+        if _has_dependency(dependency, name, level=level - 1 if level is not None else None):
+            return True
+
+    return False
 
 
 def upgrade_response_model(router: fastapi.routing.APIRouter) -> None:
